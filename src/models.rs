@@ -12,8 +12,8 @@ pub struct FoodItem {
     pub kcal: f32,
     pub proteins: f32,
     pub carbohydrates: f32,
-    pub fats: f32,
-    pub per_standard_portion: f32,
+    pub fat: f32,
+    pub standard_portion: f32,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
