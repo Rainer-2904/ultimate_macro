@@ -1,7 +1,7 @@
 use crate::models::FoodItem;
 use serde::Deserialize;
 
-// --- API Responce Structures ---
+// --- API Response Structures ---
 // Using serde we can ignore the massive amount of data we get 
 // from openfoodfacts.org/api and only extract what we need
 //
