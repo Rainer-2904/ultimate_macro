@@ -1,6 +1,7 @@
 mod models;
 mod api;
 mod db;
+mod calc;
 
 use models::FoodItem;
 

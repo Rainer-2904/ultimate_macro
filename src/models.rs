@@ -17,9 +17,17 @@ pub struct FoodItem {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct ConsumptionLog {
+pub struct DailyConsumptionLog {
     pub id: Option<i64>,
     pub food_id: i64,
     pub quantity_in_grams: f32,
-    pub consumtion_date: String,
+    pub consumption_date: String,
+}
+
+#[derive(Debug, Default)]
+pub struct DailyMacroSummary {
+    pub kcal: f32,
+    pub proteins: f32,
+    pub carbohydrates: f32,
+    pub fat: f32,
 }
