@@ -3,53 +3,71 @@ mod api;
 mod db;
 mod calc;
 
+use chrono::Local;
 use models::FoodItem;
 
 #[tokio::main]
 async fn main() {
-    println!("--- DB TEST ---\n");
+    println!("--- Testing Delete and Update functions ---\n");
 
-    match db::init_db() {
-        Ok(_) => println!("Init successful"),
+    // 1. Initialize local database
+    if let Err(e) = db::init_db() {
+        eprintln!("Failed to initialize database: {}", e);
+        return;
+    }
+
+    // 2. Automatically get today's date in YYYY-MM-DD format
+    let today = Local::now().format("%Y-%m-%d").to_string();
+    println!("Today's date (auto): {}\n", today);
+
+    // 3. Ensure we have a test product in local DB
+    let test_barcode = "5941141000049"; // Zuzu Milk
+    
+    let food_id = match db::get_product_by_barcode(test_barcode) {
+        Ok(Some(food)) => food.id.unwrap(),
+        Ok(None) => {
+            println!("Product not found locally, inserting test product...");
+            let new_food = FoodItem {
+                id: None,
+                product_name: "Lapte Zuzu 1.5%".to_string(),
+                brand: "Zuzu".to_string(),
+                barcode: test_barcode.to_string(),
+                kcal: 44.0,
+                proteins: 3.2,
+                carbohydrates: 4.7,
+                fat: 1.5,
+                standard_portion: 100.0,
+            };
+            db::insert_food(&new_food).expect("Failed to insert test food")
+        }
         Err(e) => {
-            eprintln!("Error: {}", e);
+            eprintln!("Database error: {}", e);
             return;
         }
-    }
-
-    let test_barcode = "1234567890";
-    let test_food = FoodItem {
-        id: None,
-        product_name: "Test Product".to_string(),
-        brand: "Test Brand".to_string(),
-        barcode: test_barcode.to_string(),
-        kcal: 300.0,
-        proteins: 20.4,
-        carbohydrates: 25.0,
-        fat: 1.0,
-        standard_portion:100.0,
     };
 
-    println!("Searching local db for barcode {}", test_barcode);
+    println!("Logging mistake: 5000g of milk");
+    let log_id = db::log_food_consumption(food_id, 5000.0, &today).unwrap();
+    println!("  => Created log entry with ID: {}", log_id);
 
-    match db::get_product_by_barcode(test_barcode) {
-        Ok(Some(food)) => {
-            println!("Found product in internal DB: {}", food.id.unwrap());
-        }
-        Ok(None) => {
-            println!("Product not found in internal DB, inserting now...");
-
-            match db::insert_food(&test_food) {
-                Ok(new_id) => println!("Insert successful, item saved with id: {}", new_id),
-                Err(e) => eprintln!("Error: {}", e),
+    println!("\nCorrecting mistake: updating log ID {} to 250g...", log_id);
+    match db::update_log_quantity(log_id, 250.0) {
+        Ok(rows) if rows > 0 => println!("    Successfully updated {} row(s)!", rows),
+        Ok(_) => println!("    Log entry with ID {} not found.", log_id),
+        Err(e) => eprintln!("    Update failed: {}", e),
+    }
+    if let Ok(items) = db::get_logged_foods_for_date(&today) {
+        println!("    Current log entries for today:");
+        for item in items {
+            if item.log_id == log_id {
+                println!("      - ID [{}]: {} -> {:.1}g ({:.1} kcal)", item.log_id, item.product_name, item.quantity_in_grams, item.specific_macros.kcal);
             }
         }
-        Err(e) => eprintln!("DB read error: {}", e),
     }
-
-    if let Ok(Some(saved_food)) = db::get_product_by_barcode(test_barcode) {
-        println!("Data extracted out of local db: {} ({})", saved_food.product_name, saved_food.brand);
-        println!("     - Kcal:   {:.1}", saved_food.kcal);
-        println!("     - Prot:   {:.1}g", saved_food.proteins);
+    println!("\nDeleting log ID {}...", log_id);
+    match db::delete_log_entry(log_id) {
+        Ok(rows) if rows > 0 => println!("    Successfully deleted {} row(s)!", rows),
+        Ok(_) => println!("    Log entry with ID {} not found.", log_id),
+        Err(e) => eprintln!("    Delete failed: {}", e),
     }
 }

@@ -1,5 +1,5 @@
 use rusqlite::{params, Connection, Result, OptionalExtension};
-use crate::models::{DailyMacroSummary, FoodItem};
+use crate::models::{DailyMacroSummary, FoodItem, LogDisplayItem};
 use crate::calc;
 
 // Open local db connection/Create it if it does not exist
@@ -92,7 +92,7 @@ pub fn get_daily_macros(date: &str) -> Result<DailyMacroSummary> {
     let mut stmt = conn.prepare(
         "SELECT d.quantity_in_grams, f.kcal, f.proteins, f.carbohydrates, f.fat, f.standard_portion
         FROM consumption_log d
-        JOIN food f ON d.food_id = f.id
+        JOIN foods f ON d.food_id = f.id
         WHERE d.consumption_date = ?1"
     )?;
 
@@ -120,4 +120,81 @@ pub fn get_daily_macros(date: &str) -> Result<DailyMacroSummary> {
     }
 
     Ok(total)
+}
+
+pub fn log_food_consumption(food_id: i64, quantity_in_grams: f32, consumption_date: &str) -> Result<i64> {
+    let conn = get_connection()?;
+
+    conn.execute(
+        "INSERT INTO consumption_log (food_id, quantity_in_grams, consumption_date)
+        VALUES (?1, ?2, ?3)",
+        params![food_id, quantity_in_grams, consumption_date],
+    )?;
+    Ok(conn.last_insert_rowid())
+}
+
+pub fn get_logged_foods_for_date(date: &str) -> Result<Vec<LogDisplayItem>> {
+    let conn = get_connection()?;
+
+    let mut stmt = conn.prepare(
+        "SELECT d.id, f.product_name, f.brand, d.quantity_in_grams, 
+            f.kcal, f.proteins, f.carbohydrates, f.fat, f.standard_portion
+         FROM consumption_log d
+         JOIN foods f ON d.food_id = f.id
+         WHERE d.consumption_date = ?1"
+    )?;
+
+    let rows = stmt.query_map(params![date], |row| {
+        let log_id: i64 = row.get(0)?;
+        let product_name: String = row.get(1)?;
+        let brand: String = row.get(2)?;
+        let quantity: f32 = row.get(3)?;
+        
+        let kcal: f32 = row.get(4)?;
+        let proteins: f32 = row.get(5)?;
+        let carbohydrates: f32 = row.get(6)?;
+        let fat: f32 = row.get(7)?;
+        let portion_size: f32 = row.get(8)?;
+
+        let specific_macros = calc::calculate_consumed_macros(
+            quantity, portion_size, kcal, proteins, carbohydrates, fat
+        );
+
+        Ok(LogDisplayItem {
+            log_id,
+            product_name,
+            brand,
+            quantity_in_grams: quantity,
+            specific_macros,
+        })
+    })?;
+
+    let mut daily_items = Vec::new();
+    for item in rows {
+        daily_items.push(item?);
+    }
+
+    Ok(daily_items)
+}
+
+pub fn delete_log_entry(log_id: i64) -> Result<usize> {
+    let conn = get_connection()?;
+
+    let rows_affected = conn.execute(
+        "DELETE FROM consumption_log WHERE id = ?1",
+        params![log_id],
+    )?;
+    // Returns 1 if deleted, 0 if log_id was not found
+    Ok(rows_affected)
+}
+
+pub fn update_log_quantity(log_id: i64, new_quantity_in_grams: f32) -> Result<usize> {
+    let conn = get_connection()?;
+
+    let rows_affected = conn.execute(
+        "UPDATE consumption_log SET quantity_in_grams = ?1 WHERE id =?2",
+        params![new_quantity_in_grams, log_id],
+    )?;
+    // Returns number of affected rows
+    Ok(rows_affected)
 }
