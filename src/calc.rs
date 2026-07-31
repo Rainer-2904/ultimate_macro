@@ -18,7 +18,6 @@ pub fn calculate_consumed_macros(
     }
 }
 
-// Now we add a simple fn, useful for accumulating totals over the duration of a day
 pub fn add_summaries(mut current_total: DailyMacroSummary, entry: DailyMacroSummary) -> DailyMacroSummary {
     current_total.kcal += entry.kcal;
     current_total.proteins += entry.proteins;

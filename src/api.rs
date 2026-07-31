@@ -38,7 +38,6 @@ struct OffNutriments {
 pub async fn fetch_food_by_barcode(barcode: &str) -> Result<FoodItem, String> {
     let url = format!("https://world.openfoodfacts.org/api/v0/product/{}.json", barcode);
 
-    // Create HTTP client
     let client = reqwest::Client::new();
 
     // Define User-Agent to comply with Open Food Facts API ToS
