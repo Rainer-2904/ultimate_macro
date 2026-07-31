@@ -1,5 +1,6 @@
 use crate::models::FoodItem;
 use serde::Deserialize;
+use reqwest::header::USER_AGENT;
 
 // --- API Response Structures ---
 // Using serde we can ignore the massive amount of data we get 
@@ -37,8 +38,17 @@ struct OffNutriments {
 pub async fn fetch_food_by_barcode(barcode: &str) -> Result<FoodItem, String> {
     let url = format!("https://world.openfoodfacts.org/api/v0/product/{}.json", barcode);
 
-    // HTTP get request
-    let response = reqwest::get(&url) 
+    let client = reqwest::Client::new();
+
+    // Define User-Agent to comply with Open Food Facts API ToS
+    // Format: AppName - System - Version - ContactInfo
+    let custom_user_agent = "UltimateMacro - Android/Linux - Version 0.1 - https://github.com/Rainer-2904";
+
+    // Make request with header
+    let response = client
+    .get(&url)
+    .header(USER_AGENT, custom_user_agent)
+    .send()
     .await
     .map_err(|e| format!("Failed to send request: {}", e))?;
 

@@ -31,3 +31,20 @@ pub struct DailyMacroSummary {
     pub carbohydrates: f32,
     pub fat: f32,
 }
+
+#[derive(Debug)]
+pub struct LogDisplayItem {
+    pub log_id: i64,
+    pub product_name: String,
+    pub brand: String,
+    pub quantity_in_grams: f32,
+    pub specific_macros: DailyMacroSummary,
+}
+
+#[derive(Debug, Clone)]
+pub struct DailyMacroGoal {
+    pub target_kcal: f32,
+    pub target_proteins: f32,
+    pub target_carbohydrates: f32,
+    pub target_fat: f32,
+}
