@@ -1,5 +1,9 @@
 /target
-/src/ultimate_macro.db
-/src/execution.log
 cspell.json
 
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+
+*.log

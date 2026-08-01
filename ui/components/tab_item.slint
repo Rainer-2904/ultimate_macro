@@ -1,0 +1,30 @@
+// --- Custom component for footer buttons --- \\
+export component TabItem inherits Rectangle {
+    in property <image> icon;
+    in property <bool> active;
+    callback clicked();
+
+    width: 64px;
+    height: 40px;
+    border-radius: 20px;
+
+    background: active ? #313244 : transparent;
+    animate background {
+        duration: 100ms;
+        easing: ease-in-out;
+    }
+
+    Image {
+        source: root.icon;
+        width: 24px;
+        height: 24px;
+        colorize: active ? #a6e3a1 : #6f727c;
+        animate colorize {
+            duration: 100ms;
+        }
+        
+        TouchArea {
+            clicked => { root.clicked() ; }
+        }
+    }
+}

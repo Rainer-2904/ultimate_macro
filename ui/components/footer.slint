@@ -1,0 +1,38 @@
+import {TabItem} from "tab_item.slint";
+
+export component Footer inherits Rectangle {
+    in-out property <int> activeTab: 0;
+
+    height: 70px;
+    background: #11111b;
+    // Rounded top corners to look aesthetically pleasing
+    border-top-left-radius: 18px;
+    border-top-right-radius: 18px;
+
+    HorizontalLayout {
+        alignment: space-around;
+        padding-top: 15px;
+        padding-bottom: 15px;
+
+        TabItem {
+            icon: @image-url("../icons/home.svg");
+            active: root.activeTab == 0;
+            clicked => { root.activeTab = 0; }
+        }
+        TabItem {
+            icon: @image-url("../icons/zoom-scan.svg");
+            active: root.activeTab == 1;
+            clicked => { root.activeTab = 1; }
+        }
+        TabItem {
+            icon: @image-url("../icons/chart-pie-3.svg");
+            active: root.activeTab == 2;
+            clicked => { root.activeTab = 2; }
+        }
+        TabItem {
+            icon: @image-url("../icons/settings.svg");
+            active: root.activeTab == 3;
+            clicked => { root.activeTab = 3; }
+        }
+    }
+}
