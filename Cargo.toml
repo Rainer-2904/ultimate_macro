@@ -12,3 +12,7 @@ rusqlite = {version = "0.40.1", features = ["bundled"] }
 chrono = "0.4.45"
 log = "0.4"
 simplelog = "0.12"
+slint = "1.17.0"
+
+[build-dependencies]
+slint-build = "1.17.0"

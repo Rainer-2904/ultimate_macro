@@ -1,0 +1,30 @@
+// --- UI IS NOT SCALABLE YET --- \\
+// ---   PROOF OF CONCEPT  --- \\
+
+import { Footer } from "components/footer.slint";
+import { HomeTab } from "tabs/home_tab.slint";
+import { ScanTab } from "tabs/scan_tab.slint";
+import { ChartTab } from "tabs/chart_tab.slint";
+import { SettingsTab } from "tabs/settings_tab.slint";
+
+export component MainWindow inherits Window {
+    width: 400px;
+    height: 800px;
+    title: "Ultimate Macro";
+    background: #1e1e2e;
+
+    in-out property <int> activeTab: 0;
+
+    VerticalLayout {
+        Rectangle {
+            if (root.activeTab == 0) : HomeTab {}
+            if (root.activeTab == 1) : ScanTab {}
+            if (root.activeTab == 2) : ChartTab {}
+            if (root.activeTab == 3) : SettingsTab {}
+        }
+        // Footer
+        Footer {
+            activeTab <=> root.activeTab;
+        }
+    }
+}
