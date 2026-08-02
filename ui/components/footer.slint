@@ -1,7 +1,7 @@
 import {TabItem} from "tab_item.slint";
 
 export component Footer inherits Rectangle {
-    in-out property <int> activeTab: 0;
+    in-out property <int> active-tab: 0;
 
     height: 70px;
     background: #11111b;
@@ -16,23 +16,23 @@ export component Footer inherits Rectangle {
 
         TabItem {
             icon: @image-url("../icons/home.svg");
-            active: root.activeTab == 0;
-            clicked => { root.activeTab = 0; }
+            active: root.active-tab == 0;
+            clicked => { root.active-tab = 0; }
         }
         TabItem {
             icon: @image-url("../icons/zoom-scan.svg");
-            active: root.activeTab == 1;
-            clicked => { root.activeTab = 1; }
+            active: root.active-tab == 1;
+            clicked => { root.active-tab = 1; }
         }
         TabItem {
             icon: @image-url("../icons/chart-pie-3.svg");
-            active: root.activeTab == 2;
-            clicked => { root.activeTab = 2; }
+            active: root.active-tab  == 2;
+            clicked => { root.active-tab = 2; }
         }
         TabItem {
             icon: @image-url("../icons/settings.svg");
-            active: root.activeTab == 3;
-            clicked => { root.activeTab = 3; }
+            active: root.active-tab == 3;
+            clicked => { root.active-tab = 3; }
         }
     }
 }

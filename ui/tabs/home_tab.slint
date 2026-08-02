@@ -1,7 +1,71 @@
+import { MacroBar } from "../components/macro_bar.slint";
+import { ArcProgressBar, ArcData } from "../components/arc_progress_bar.slint";
 export component HomeTab inherits Rectangle {
-    Text {
-        text: "Home Tab - Progress Ring & Daily Log";
-        color: #a6e3a1;
-        font-size: 18px;
+    background: transparent;
+
+    VerticalLayout {
+        padding: 10px;
+        padding-top: 45px;
+        spacing: 20px;
+        alignment: start;
+    
+        // Arc progress bar
+        Rectangle {
+            height: 160px;
+            background: #181825;
+            border-radius: 20px;
+
+            ArcProgressBar {
+                center-text-primary: "1500";
+                center-text-secondary: "out of 2500kcal";
+
+                arcs: [
+                    { color: #cf2626, current: 160, max: 160 }, // Proteins
+                    { color: #29bdeb, current: 120, max: 250 }, // Carbohydrates
+                    { color: #25aa37, current: 10, max: 100 } // Fats
+                ];
+            }
+        }
+    }
+
+    // Macro bars
+    VerticalLayout {
+        spacing: 15px;
+        padding-top: 10px;
+        padding-bottom: 20px;
+        
+        Text {
+            text: "Macros";
+            color: #cdd6f4;
+            font-size: 20px;
+            font-weight: 700;
+            horizontal-alignment: center;
+        }
+        // Example macro bars (dynamic values will be set in the future)
+        MacroBar {
+            title: "Proteins";
+            bar-color: #cf2626;
+            current: 105;
+            max: 160;
+        }
+        MacroBar {
+            title: "Carbohydrates";
+            bar-color: #29bdeb;
+            current: 120;
+            max: 250;
+        }
+        MacroBar {
+            title: "Fats";
+            bar-color: #25aa37;
+            current: 60;
+            max: 100;
+        }
+        MacroBar {
+            title: "Kcal";
+            bar-color: #dbb015;
+            current: 1500;
+            max: 2500;
+            unit: "kcal";
+        }
     }
 }

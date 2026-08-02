@@ -13,18 +13,18 @@ export component MainWindow inherits Window {
     title: "Ultimate Macro";
     background: #1e1e2e;
 
-    in-out property <int> activeTab: 0;
+    in-out property <int> active-tab: 0;
 
     VerticalLayout {
         Rectangle {
-            if (root.activeTab == 0) : HomeTab {}
-            if (root.activeTab == 1) : ScanTab {}
-            if (root.activeTab == 2) : ChartTab {}
-            if (root.activeTab == 3) : SettingsTab {}
+            if (root.active-tab == 0) : HomeTab {}
+            if (root.active-tab == 1) : ScanTab {}
+            if (root.active-tab == 2) : ChartTab {}
+            if (root.active-tab == 3) : SettingsTab {}
         }
         // Footer
         Footer {
-            activeTab <=> root.activeTab;
+            active-tab <=> root.active-tab;
         }
     }
 }
