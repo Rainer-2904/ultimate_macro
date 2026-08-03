@@ -2,6 +2,7 @@ export struct ArcData {
     color: color,
     current: float,
     max: float,
+    unit: string,
 }
 
 export component ArcProgressBar inherits Rectangle {
@@ -10,10 +11,10 @@ export component ArcProgressBar inherits Rectangle {
     in property <string> center-text-secondary;
     
     width: 250px;
-    height: 140px;
+    height: 175px;
 
-    property <float> w: root.width / 1px;
-    property <float> h: root.height / 1px;
+    property <float> width-px: root.width / 1px;
+    property <float> height-px: root.height / 1px;
 
     property <float> stroke-width: 14.0;
     // ===============================
@@ -21,16 +22,16 @@ export component ArcProgressBar inherits Rectangle {
     // ===============================
     for arcs[index] in root.arcs : Rectangle {
         //This will create the spacing after each arc iteration
-        property <length> r: (parent.width / 2) - 10px - (index * 20px); 
+        property <length> container-radius: (parent.width / 2) - 10px - (index * 20px); 
         
-        // Make the container a rectangle instead of a square to avoid
+        // Make the container progress-angle rectangle instead of progress-angle square to avoid
         // graphic engine stretching or deforming the arch
-        width: 2 * r;
-        height: r;
+        width: 2 * container-radius;
+        height: container-radius;
         
         // Center it horizontally and align it on the same base
         x: (parent.width - self.width) / 2;
-        y: parent.height - self.height - 15px;
+        y: parent.height - self.height - 50px;
 
         Path {
             width: 100%; height: 100%;
@@ -38,26 +39,26 @@ export component ArcProgressBar inherits Rectangle {
             stroke-width: 14px;
             fill: transparent;
 
-            // DO NOT REMOVE!! Without it, a slight change in resolution could end up deforming the arcs
+            // DO NOT REMOVE!! Without it, progress-angle slight change in resolution could end up deforming the arcs
             // This prevents Slint from stretching to 'better' fit inside container
             viewbox-width: self.width / 1px;
             viewbox-height: self.height / 1px;
 
-            property <float> w: self.width / 1px;
-            property <float> h: self.height / 1px;
+            property <float> width-px: self.width / 1px;
+            property <float> height-px: self.height / 1px;
             property <float> stroke-half: 7.0;
 
             // Start drawing from the left
             MoveTo { 
                 x: stroke-half; 
-                y: h - stroke-half; 
+                y: height-px - stroke-half; 
             }
             // Finish drawing in the right
             ArcTo {
-                radius-x: w / 2 - stroke-half;
-                radius-y: h - stroke-half;
-                x: w - stroke-half;
-                y: h - stroke-half;
+                radius-x: width-px / 2 - stroke-half;
+                radius-y: height-px - stroke-half;
+                x: width-px - stroke-half;
+                y: height-px - stroke-half;
                 sweep: true; 
             }
         }
@@ -67,17 +68,17 @@ export component ArcProgressBar inherits Rectangle {
     // ===============================
     for arcs[index] in root.arcs : Rectangle {
         // Same container alignment
-        property <length> r: (parent.width / 2) - 10px - (index * 20px); 
+        property <length> container-radius: (parent.width / 2) - 10px - (index * 20px); 
     
-        width: 2 * r; 
-        height: r;
+        width: 2 * container-radius; 
+        height: container-radius;
         x: (parent.width - self.width) / 2;
-        y: parent.height - self.height - 15px;
+        y: parent.height - self.height - 50px;
 
         Path {
             width: 100%; 
             height: 100%;
-            // DO NOT REMOVE!! Without it, a slight change in resolution could end up deforming the arcs
+            // DO NOT REMOVE!! Without it, progress-angle slight change in resolution could end up deforming the arcs
             // This prevents Slint from stretching to 'better' fit inside container
             viewbox-width: self.width / 1px;
             viewbox-height: self.height / 1px;
@@ -88,24 +89,24 @@ export component ArcProgressBar inherits Rectangle {
             stroke: progress > 0 ? arcs.color : transparent;
             stroke-width: 14px; fill: transparent;
 
-            property <float> w: self.width / 1px;
-            property <float> h: self.height / 1px;
-            property <float> sh: 7.0;
-            property <float> rad: w / 2 - sh;
+            property <float> width-px: self.width / 1px;
+            property <float> height-px: self.height / 1px;
+            property <float> half-stroke: 7.0;
+            property <float> path-radius: width-px / 2 - half-stroke;
 
-            property <angle> a: 180deg - (progress * 180deg);
+            property <angle> progress-angle: 180deg - (progress * 180deg);
 
             // Start drawing from the left
             MoveTo { 
-                x: sh;
-                y: h - sh; 
+                x: half-stroke;
+                y: height-px - half-stroke; 
             }
             // Finish drawing in the right
             ArcTo {
-                radius-x: rad; 
-                radius-y: rad;
-                x: (w / 2) + rad * cos(a);
-                y: (h - sh) - rad * sin(a);
+                radius-x: path-radius; 
+                radius-y: path-radius;
+                x: (width-px / 2) + path-radius * cos(progress-angle);
+                y: (height-px - half-stroke) - path-radius * sin(progress-angle);
                 sweep: true;
             }
         }
@@ -114,7 +115,7 @@ export component ArcProgressBar inherits Rectangle {
     // Center text
     VerticalLayout {
         alignment: end;
-        padding: -10px;
+        padding-bottom: 25px;
         spacing: 1px;
         
         Text {
@@ -131,6 +132,35 @@ export component ArcProgressBar inherits Rectangle {
             color: #bac2de;
             horizontal-alignment: center;
             vertical-alignment: bottom;
+        }
+    }
+
+    // Remaining consumption log
+    HorizontalLayout {
+        y: parent.height - 20px;
+        width: parent.width + 100px;
+        alignment: space-around;
+
+        for arc in root.arcs : HorizontalLayout {
+            spacing: 6px;
+
+            VerticalLayout {
+                Rectangle {
+                    width: 10px;
+                    height: 10px;
+                    border-radius: 5px;
+                    background: arc.color;
+                }
+            }
+            VerticalLayout {
+                alignment: start;
+                Text {
+                    text: max(0, round(arc.max - arc.current)) + arc.unit + " to go";
+                    color: #bac2de;
+                    font-size: 16px;
+                    font-weight: 600;
+                }
+            }
         }
     }
 }
