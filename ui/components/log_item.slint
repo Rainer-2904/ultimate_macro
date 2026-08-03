@@ -1,0 +1,74 @@
+export component LogItem inherits Rectangle {
+    in property <string> name;
+    in property <string> details;
+    in property <string> proteins;
+    in property <string> carbohydrates;
+    in property <string> fats;
+    in property <string> calories;
+
+    height: 70px;
+    background: #181825;
+    border-radius: 12px;
+
+    HorizontalLayout {
+        padding: 12px;
+        alignment: space-between;
+
+        // Left side containing item
+        VerticalLayout {
+            alignment: center;
+            spacing: 4px;
+            horizontal-stretch: 1;
+
+            Text {
+                text: root.name;
+                color: #cdd6f4;
+                font-size: 16px;
+                font-weight: 600;
+                overflow: elide;
+            }
+            Text {
+                text: root.details;
+                color: #a6adc8;
+                font-size: 13px;
+            }
+        }
+
+        // Right side containing the calories and macros for item
+        VerticalLayout {
+            alignment: center;
+            spacing: 6px;
+
+            Text {
+                text: root.calories + "kcal";
+                color: #dbb015;
+                font-size: 16px;
+                font-weight: 700;
+                horizontal-alignment: right;
+            }
+            HorizontalLayout {
+                alignment: end;
+                spacing: 8px;
+
+                Text {
+                    text: root.proteins + "P";
+                    color: #cf2626;
+                    font-size: 12px;
+                    font-weight: 700;
+                }
+                Text {
+                    text: root.carbohydrates + "C";
+                    color: #29bdeb;
+                    font-size: 12px;
+                    font-weight: 700;
+                }
+                Text {
+                    text: root.fats + "F";
+                    color: #25aa37;
+                    font-size: 12px;
+                    font-weight: 700;
+                }
+            }
+        }
+    }
+}

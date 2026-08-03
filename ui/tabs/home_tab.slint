@@ -1,7 +1,140 @@
+import { MacroBar } from "../components/macro_bar.slint";
+import { ArcProgressBar, ArcData } from "../components/arc_progress_bar.slint";
+import { LogItem } from "../components/log_item.slint";
+import { ScannerOverlay } from "../components/scanner_overlay.slint";
+
 export component HomeTab inherits Rectangle {
-    Text {
-        text: "Home Tab - Progress Ring & Daily Log";
-        color: #a6e3a1;
-        font-size: 18px;
+    property <bool> show-scanner: false;
+
+    width: 100%;
+    height: 100%;
+    background: transparent;
+
+    // Base container
+    VerticalLayout {
+        width: 100%;
+        height: 100%;
+
+        // Arc progress bar
+        VerticalLayout {
+            padding: 10px;
+            padding-top: 45px;
+            alignment: start;
+        
+            Rectangle {
+                height: 180px;
+                background: #181825;
+                border-radius: 20px;
+
+                ArcProgressBar {
+                    center-text-primary: "1500";
+                    center-text-secondary: "out of 2500kcal";
+
+                    arcs: [
+                        { color: #cf2626, current: 160, max: 160, unit: "g" },
+                        { color: #29bdeb, current: 120, max: 250, unit: "g" },
+                        { color: #25aa37, current: 10, max: 100, unit: "g" }
+                    ];
+                }
+            }
+        }
+
+        // Macro bars
+        VerticalLayout {
+            spacing: 15px;
+            padding-left: 10px;
+            padding-right: 10px;
+            padding-top: 10px;
+            padding-bottom: 20px;
+            
+            Text {
+                text: "Macros";
+                color: #cdd6f4;
+                font-size: 20px;
+                font-weight: 700;
+                horizontal-alignment: center;
+            }
+            MacroBar { title: "Proteins"; bar-color: #cf2626; current: 160; max: 160; }
+            MacroBar { title: "Carbohydrates"; bar-color: #29bdeb; current: 120; max: 250; }
+            MacroBar { title: "Fats"; bar-color: #25aa37; current: 10; max: 100; }
+            MacroBar { title: "Kcal"; bar-color: #dbb015; current: 1500; max: 2500; unit: "kcal"; }
+        }
+
+        // Daily logs
+        Flickable {
+            // vertical-stretch to force occupying free space
+            vertical-stretch: 1;
+            viewport-height: main-layout.preferred-height;
+
+            main-layout := VerticalLayout {
+                padding-left: 20px;
+                padding-right: 20px;
+                spacing: 20px;
+                alignment: start;
+
+                Text {
+                    text: "Daily Log";
+                    color: #cdd6f4;
+                    font-size: 20px;
+                    font-weight: 700;
+                }
+
+                VerticalLayout {
+                    spacing: 10px;
+                    
+                    LogItem { name: "Chicken breast"; details: "200g"; calories: "330"; proteins: "62"; carbohydrates: "0"; fats: "7"; }
+                    LogItem { name: "Chicken breast [see if it scales correctly this is very long]"; details: "200g"; calories: "330"; proteins: "62"; carbohydrates: "0"; fats: "7"; }
+                    LogItem { name: "Chicken breast"; details: "200g"; calories: "330"; proteins: "62"; carbohydrates: "0"; fats: "7"; }
+                    LogItem { name: "Chicken breast"; details: "200g"; calories: "330"; proteins: "62"; carbohydrates: "0"; fats: "7"; }
+                }
+                
+                // Spacer to be able to scroll the last item above FAB 
+                Rectangle { height: 100px; }
+            }
+        }
+    }
+
+    // 4. Floating Action Button (FAB)
+    Rectangle {
+        width: 50px;
+        height: 50px;
+
+        x: parent.width - self.width - 20px;
+        y: parent.height - self.height - 20px;
+
+        background: #26d61a;
+        border-radius: self.width / 2;
+
+        drop-shadow-blur: 12px;
+        drop-shadow-color: #00000040;
+        drop-shadow-offset-y: 4px;
+
+        Image {
+            source: @image-url("../icons/plus.svg");
+            width: 32px;
+            height: 32px;
+            colorize: #11111b;
+
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+        }
+
+        TouchArea {
+            width: 100%;
+            height: 100%;
+
+            clicked => {
+                root.show-scanner = true;
+            }
+        }
+    }
+
+    if root.show-scanner : ScannerOverlay {
+        width: 100%;
+        height: 100%;
+
+        close => {
+            root.show-scanner = false;
+        }
     }
 }

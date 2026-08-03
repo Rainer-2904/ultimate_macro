@@ -1,0 +1,52 @@
+export component MacroBar inherits Rectangle {
+    in property <string> title;
+    in property <color> bar-color;
+    in property <float> current;
+    in property <float> max;
+    in property <string> unit: "g"; // Default unit is grams, can be overridden
+
+    height: 45px;
+
+    VerticalLayout {
+        spacing: 6px;
+        padding: 6px;
+
+        //Header, title left, value right
+        HorizontalLayout {
+            Text {
+                text: root.title;
+                color: #cdd6f4;
+                font-size: 14px;
+                font-weight: 600;
+            }
+            Rectangle {} // Spacer
+            Text {
+                text: round(root.current) + "/" + round(root.max) + root.unit;
+                color: #bac2de;
+                font-size: 14px;
+            }
+        }
+        // Bar
+        Rectangle {
+            height: 8px;
+            border-radius: 4px;
+            background: #313244; // Empty bar color
+
+            // Filled bar
+            Rectangle {
+                x: 0;
+                // Calculate the width based on current/max.
+                // Use a min() to ensure it doesn't exceed the parent width.
+                width: parent.width * (root.max > 0 ? min(1, root.current / root.max) : 0);
+                height: 100%;
+                background: root.bar-color;
+                border-radius: 4px;
+
+                animate width {
+                    duration: 400ms;
+                    easing: ease-out;
+                }
+            }
+        }
+    }
+}

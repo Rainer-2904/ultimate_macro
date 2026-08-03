@@ -1,0 +1,2 @@
+*.rs linguist-detectable=true
+*.slint linguist-detectable=true
