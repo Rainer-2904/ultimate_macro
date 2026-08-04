@@ -14,10 +14,19 @@ export component MainWindow inherits Window {
     background: #1e1e2e;
 
     in-out property <int> active-tab: 0;
+    in property <int> total-calories: 0;
+    in property <string> scanner-status-text: "Scanning";
+
+    callback open-scanner();
 
     VerticalLayout {
         Rectangle {
-            if (root.active-tab == 0) : HomeTab {}
+            if (root.active-tab == 0) : HomeTab {
+                scanner-status-text: root.scanner-status-text;
+                open-scanner => {
+                    root.open-scanner()
+                }
+            }
             if (root.active-tab == 1) : ScanTab {}
             if (root.active-tab == 2) : ChartTab {}
             if (root.active-tab == 3) : SettingsTab {}

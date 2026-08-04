@@ -4,11 +4,14 @@ import { LogItem } from "../components/log_item.slint";
 import { ScannerOverlay } from "../components/scanner_overlay.slint";
 
 export component HomeTab inherits Rectangle {
-    property <bool> show-scanner: false;
-
     width: 100%;
     height: 100%;
     background: transparent;
+
+    in property <string> scanner-status-text;
+    callback open-scanner();
+
+    property <bool> show-scanner: false;
 
     // Base container
     VerticalLayout {
@@ -125,6 +128,7 @@ export component HomeTab inherits Rectangle {
 
             clicked => {
                 root.show-scanner = true;
+                root.open-scanner();
             }
         }
     }
@@ -132,6 +136,8 @@ export component HomeTab inherits Rectangle {
     if root.show-scanner : ScannerOverlay {
         width: 100%;
         height: 100%;
+
+        status-text: root.scanner-status-text;
 
         close => {
             root.show-scanner = false;
