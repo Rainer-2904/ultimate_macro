@@ -1,2 +1,11 @@
-# Ultimate_Macro
-## Work in progress, no stable/working version yet.
+# Ultimate Macro
+
+Work-in-progress nutrition tracker built with Rust, Slint, and SQLite.
+
+```sh
+cargo run
+cargo test
+```
+
+Desktop supports manual barcode lookup and quantity confirmation. Android adds a
+camera scanner; see [Android setup and device checks](android/README.md).

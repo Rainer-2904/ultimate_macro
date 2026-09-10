@@ -1,0 +1,37 @@
+// std-widgets.LineEdit does not expose its placeholder brush. Keep this small
+// themed input shared across forms so colors remain independent of native style.
+export component LineEdit inherits Rectangle {
+    in-out property <string> text <=> input.text;
+    in property <string> placeholder-text;
+    in property <InputType> input-type <=> input.input-type;
+    in property <bool> enabled: true;
+    callback edited();
+    forward-focus: input;
+    min-height: 44px;
+    border-radius: 8px;
+    border-width: 1px;
+    border-color: input.has-focus ? #89b4fa : #45475a;
+    background: #181825;
+    HorizontalLayout {
+        padding: 10px;
+        Rectangle {
+            Text {
+                text: root.text == "" && input.preedit-text == "" ? root.placeholder-text : "";
+                color: #a6adc8;
+                font-size: 16px;
+                vertical-alignment: center;
+            }
+            input := TextInput {
+                enabled: root.enabled;
+                color: #cdd6f4;
+                font-size: 16px;
+                single-line: true;
+                vertical-alignment: center;
+                selection-background-color: #89b4fa;
+                selection-foreground-color: #11111b;
+                accessible-placeholder-text: root.placeholder-text;
+                edited => { root.edited(); }
+            }
+        }
+    }
+}

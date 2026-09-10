@@ -1,6 +1,7 @@
 import {TabItem} from "tab_item.slint";
 
 export component Footer inherits Rectangle {
+    // Keep indices aligned with the tab content in app.slint.
     in-out property <int> active-tab: 0;
 
     height: 70px;
@@ -20,19 +21,14 @@ export component Footer inherits Rectangle {
             clicked => { root.active-tab = 0; }
         }
         TabItem {
-            icon: @image-url("../icons/zoom-scan.svg");
+            icon: @image-url("../icons/chart-pie-3.svg");
             active: root.active-tab == 1;
             clicked => { root.active-tab = 1; }
         }
         TabItem {
-            icon: @image-url("../icons/chart-pie-3.svg");
-            active: root.active-tab  == 2;
-            clicked => { root.active-tab = 2; }
-        }
-        TabItem {
             icon: @image-url("../icons/settings.svg");
-            active: root.active-tab == 3;
-            clicked => { root.active-tab = 3; }
+            active: root.active-tab == 2;
+            clicked => { root.active-tab = 2; }
         }
     }
 }

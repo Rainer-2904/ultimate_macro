@@ -1,76 +1,50 @@
-// ---PoC--- \\
-// Will add backend to read camera later
+import { Button } from "std-widgets.slint";
+import { LineEdit } from "line_edit.slint";
 
-
+// Android supplies a native camera screen. This overlay handles lookup and
+// explicit quantity confirmation, and provides manual entry on every platform.
 export component ScannerOverlay inherits Rectangle {
-    in property <string> status-text: "Scanning";
+    in-out property <string> barcode;
+    in-out property <string> quantity;
+    in property <string> product;
+    in property <string> status-text;
+    in property <bool> busy;
+    in property <bool> ready;
+    in property <bool> camera-available;
     callback close();
-
-    background: rgba(24, 24, 37, 0.95);
-    
-    // It has no other use other than grabbing touches so the daily log list 
-    // can't be scrolled while scanner runs
-    TouchArea {}
-
+    callback start-camera();
+    callback lookup();
+    callback barcode-edited();
+    callback confirm();
+    background: #181825;
+    TouchArea {} // Block touches to the dashboard and footer underneath.
     VerticalLayout {
-        alignment: center;
-        spacing: 40px;
-
-        Text {
-            text: root.status-text;
-            font-size: 22px;
-            font-weight: 700;
-            color: #cdd6f4;
-            horizontal-alignment: center;
+        padding: 24px;
+        spacing: 16px;
+        alignment: start;
+        Text { text: "Add food"; color: #cdd6f4; font-size: 26px; font-weight: 700; }
+        if root.camera-available : Button {
+            text: "Scan barcode";
+            enabled: !root.busy;
+            clicked => { root.start-camera(); }
         }
-
-        //Viewfinder
-        HorizontalLayout {
-            alignment: center;
-
-            Rectangle {
-                width: 250px;
-                height: 180px;
-                border-width: 4px;
-                border-color: #a6e3a1;
-                border-radius: 16px;
-                background: transparent;
-
-                // Red 'laser' line (purely aesthetic)
-                Rectangle {
-                    width: 96%;
-                    height: 2px;
-                    background: #d46182;
-                    y: parent.height / 2;
-                    drop-shadow-blur: 8px;
-                    drop-shadow-color: #d46182;
-                }
-            }
+        Text { text: "Barcode"; color: #a6adc8; }
+        LineEdit {
+            text <=> root.barcode;
+            placeholder-text: "Enter product barcode";
+            input-type: number;
+            enabled: !root.busy;
+            edited => { root.barcode-edited(); }
         }
-
-        // Close button
-        HorizontalLayout {
-            alignment: center;
-
-            Rectangle {
-                width: 130px;
-                height: 45px;
-                background: #cdd6f4;
-                border-radius: 22px;
-
-                Text {
-                    text: "Cancel";
-                    color: #11111b;
-                    font-weight: 700;
-                    font-size: 16px;
-                    horizontal-alignment: center;
-                    vertical-alignment: center;
-                }
-
-                TouchArea {
-                    clicked => { root.close(); }
-                }
-            }
+        Button { text: "Find product"; enabled: !root.busy; clicked => { root.lookup(); } }
+        Text { text: root.status-text; color: #a6adc8; wrap: word-wrap; }
+        if root.ready : VerticalLayout {
+            spacing: 16px;
+            Text { text: root.product; color: #cdd6f4; wrap: word-wrap; font-size: 20px; }
+            Text { text: "Consumed quantity (g)"; color: #a6adc8; }
+            LineEdit { text <=> root.quantity; placeholder-text: "e.g. 100"; input-type: decimal; }
+            Button { text: "Add to today's log"; enabled: !root.busy; clicked => { root.confirm(); } }
         }
+        Button { text: "Cancel"; clicked => { root.close(); } }
     }
 }

@@ -1,7 +1,39 @@
+import { Button } from "std-widgets.slint";
+import { LineEdit } from "../components/line_edit.slint";
+
 export component SettingsTab inherits Rectangle {
-    Text {
-        text: "Settings Tab - Daily Goals & Options";
-        color: #cba6f7;
-        font-size: 18px;
+    in-out property <string> proteins;
+    in-out property <string> carbohydrates;
+    in-out property <string> fat;
+    in-out property <string> kcal;
+    in-out property <string> status;
+    in property <bool> has-error;
+    callback save-goals();
+
+    VerticalLayout {
+        padding: 24px;
+        spacing: 16px;
+        alignment: start;
+        Text { text: "Daily goals"; color: #cdd6f4; font-size: 26px; font-weight: 700; }
+        Text {
+            text: "Set your daily targets. Use 0 for a nutrient you don't want to target.";
+            color: #a6adc8;
+            wrap: word-wrap;
+        }
+        // Keep inputs as strings until Save so incomplete edits aren't coerced to zero.
+        Text { text: "Proteins (g)"; color: #cf2626; }
+        LineEdit { text <=> root.proteins; placeholder-text: "e.g. 160"; edited => { root.status = ""; } }
+        Text { text: "Carbohydrates (g)"; color: #29bdeb; }
+        LineEdit { text <=> root.carbohydrates; placeholder-text: "e.g. 250"; edited => { root.status = ""; } }
+        Text { text: "Fats (g)"; color: #25aa37; }
+        LineEdit { text <=> root.fat; placeholder-text: "e.g. 70"; edited => { root.status = ""; } }
+        Text { text: "Kcal"; color: #dbb015; }
+        LineEdit { text <=> root.kcal; placeholder-text: "e.g. 2500"; edited => { root.status = ""; } }
+        Button { text: "Save goals"; clicked => { root.save-goals(); } }
+        Text {
+            text: root.status;
+            color: root.has-error ? #f38ba8 : #a6e3a1;
+            wrap: word-wrap;
+        }
     }
 }

@@ -1,9 +1,24 @@
-/target
+# Rust & Artifacts
+target/
+**/target/
 cspell.json
 
+# DB & Logs
 *.db
 *.db-journal
 *.sqlite
 *.sqlite3
-
 *.log
+
+# Android Build & Artifacts
+/android/.gradle/
+/android/local.properties
+/android/app/build/
+/android/build/
+/android/app/src/main/jniLibs/
+
+# Android Binaries & Release Keys
+*.apk
+*.keystore
+*.jks
+*.aab

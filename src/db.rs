@@ -1,12 +1,12 @@
-use rusqlite::{params, Connection, Result, OptionalExtension};
-use std::time::{SystemTime, UNIX_EPOCH};
-use chrono::Local;
-use crate::models::{DailyMacroSummary, FoodItem, LogDisplayItem, DailyMacroGoal};
 use crate::calc;
+use crate::models::{DailyMacroGoal, DailyMacroSummary, FoodItem, LogDisplayItem};
+use chrono::Local;
+use rusqlite::{Connection, OptionalExtension, Result, params};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 // Open local db connection/Create it if it does not exist
 pub fn get_connection() -> Result<Connection> {
-    Connection::open("ultimate_macro.db")
+    Connection::open(crate::storage::path("ultimate_macro.db"))
 }
 
 // Initialize the db tables
@@ -26,7 +26,7 @@ pub fn init_db() -> Result<()> {
         fat REAL NOT NULL,
         standard_portion REAL NOT NULL
     )",
-    [],
+        [],
     )?;
 
     // Create log table for consumption history
@@ -41,17 +41,35 @@ pub fn init_db() -> Result<()> {
         [],
     )?;
 
-    // Create the daily_goals table for user settings
-    conn.execute(
-        "CREATE TABLE IF NOT EXISTS daily_goals (
+    init_user_settings(&conn)?;
+    Ok(())
+}
+
+// One settings row per local user. Preserve the legacy table, but copy its row
+// only when settings are absent so restarting never overwrites newer goals.
+fn init_user_settings(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        "CREATE TABLE IF NOT EXISTS user_settings (
             id INTEGER PRIMARY KEY CHECK (id = 1),
-            target_kcal REAL NOT NULL,
-            target_proteins REAL NOT NULL,
-            target_carbohydrates REAL NOT NULL,
-            target_fat REAL NOT NULL
-        )",
-        [],
+            target_kcal REAL NOT NULL CHECK (target_kcal >= 0),
+            target_proteins REAL NOT NULL CHECK (target_proteins >= 0),
+            target_carbohydrates REAL NOT NULL CHECK (target_carbohydrates >= 0),
+            target_fat REAL NOT NULL CHECK (target_fat >= 0)
+        );",
     )?;
+    let legacy_exists: bool = conn.query_row(
+        "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'daily_goals')",
+        [],
+        |row| row.get(0),
+    )?;
+    if legacy_exists {
+        conn.execute_batch(
+            "INSERT OR IGNORE INTO user_settings
+             (id, target_kcal, target_proteins, target_carbohydrates, target_fat)
+             SELECT id, target_kcal, target_proteins, target_carbohydrates, target_fat
+             FROM daily_goals WHERE id = 1;",
+        )?;
+    }
     Ok(())
 }
 
@@ -81,19 +99,21 @@ pub fn get_product_by_barcode(barcode: &str) -> Result<Option<FoodItem>> {
     )?;
 
     // Map SQL row to 'FoodItem' struct (models.rs)
-    let food = stmt.query_row(params![barcode], |row| {
-        Ok(FoodItem {
-            id: row.get(0)?,
-            product_name: row.get(1)?,
-            brand: row.get(2)?,
-            barcode: row.get(3)?,
-            kcal: row.get(4)?,
-            proteins: row.get(5)?,
-            carbohydrates: row.get(6)?,
-            fat: row.get(7)?,
-            standard_portion: row.get(8)?,
+    let food = stmt
+        .query_row(params![barcode], |row| {
+            Ok(FoodItem {
+                id: row.get(0)?,
+                product_name: row.get(1)?,
+                brand: row.get(2)?,
+                barcode: row.get(3)?,
+                kcal: row.get(4)?,
+                proteins: row.get(5)?,
+                carbohydrates: row.get(6)?,
+                fat: row.get(7)?,
+                standard_portion: row.get(8)?,
+            })
         })
-    }).optional()?;
+        .optional()?;
     Ok(food)
 }
 
@@ -104,7 +124,7 @@ pub fn get_daily_macros(date: &str) -> Result<DailyMacroSummary> {
         "SELECT d.quantity_in_grams, f.kcal, f.proteins, f.carbohydrates, f.fat, f.standard_portion
         FROM consumption_log d
         JOIN foods f ON d.food_id = f.id
-        WHERE d.consumption_date = ?1"
+        WHERE d.consumption_date = ?1",
     )?;
 
     // Map trough SQL rows and delegate the math to 'calc' module
@@ -117,7 +137,12 @@ pub fn get_daily_macros(date: &str) -> Result<DailyMacroSummary> {
         let portion_size: f32 = row.get(5)?;
 
         Ok(calc::calculate_consumed_macros(
-            quantity, portion_size, kcal, proteins, carbohydrates, fat
+            quantity,
+            portion_size,
+            kcal,
+            proteins,
+            carbohydrates,
+            fat,
         ))
     })?;
 
@@ -132,7 +157,7 @@ pub fn get_daily_macros(date: &str) -> Result<DailyMacroSummary> {
     Ok(total)
 }
 
-pub fn log_food_consumption(food_id: i64, quantity_in_grams: f32,) -> Result<i64> {
+pub fn log_food_consumption(food_id: i64, quantity_in_grams: f32) -> Result<i64> {
     let conn = get_connection()?;
     // Don't change the format, keep it ISO 8601 to avoid sorting problems down the line.
     // You can parse it to be displayed in another format for the UI if you want for example 'day-month-year'
@@ -154,7 +179,7 @@ pub fn get_logged_foods_for_date(date: &str) -> Result<Vec<LogDisplayItem>> {
             f.kcal, f.proteins, f.carbohydrates, f.fat, f.standard_portion
          FROM consumption_log d
          JOIN foods f ON d.food_id = f.id
-         WHERE d.consumption_date = ?1"
+         WHERE d.consumption_date = ?1",
     )?;
 
     let rows = stmt.query_map(params![date], |row| {
@@ -162,7 +187,7 @@ pub fn get_logged_foods_for_date(date: &str) -> Result<Vec<LogDisplayItem>> {
         let product_name: String = row.get(1)?;
         let brand: String = row.get(2)?;
         let quantity: f32 = row.get(3)?;
-        
+
         let kcal: f32 = row.get(4)?;
         let proteins: f32 = row.get(5)?;
         let carbohydrates: f32 = row.get(6)?;
@@ -170,7 +195,12 @@ pub fn get_logged_foods_for_date(date: &str) -> Result<Vec<LogDisplayItem>> {
         let portion_size: f32 = row.get(8)?;
 
         let specific_macros = calc::calculate_consumed_macros(
-            quantity, portion_size, kcal, proteins, carbohydrates, fat
+            quantity,
+            portion_size,
+            kcal,
+            proteins,
+            carbohydrates,
+            fat,
         );
 
         Ok(LogDisplayItem {
@@ -192,10 +222,8 @@ pub fn get_logged_foods_for_date(date: &str) -> Result<Vec<LogDisplayItem>> {
 pub fn delete_log_entry(log_id: i64) -> Result<usize> {
     let conn = get_connection()?;
 
-    let rows_affected = conn.execute(
-        "DELETE FROM consumption_log WHERE id = ?1",
-        params![log_id],
-    )?;
+    let rows_affected =
+        conn.execute("DELETE FROM consumption_log WHERE id = ?1", params![log_id])?;
     // Returns 1 if deleted, 0 if log_id was not found
     Ok(rows_affected)
 }
@@ -219,7 +247,7 @@ pub fn insert_custom_food(
     fat: f32,
     standard_portion: f32,
 ) -> Result<i64> {
-    /* 
+    /*
     We generate a unique string based on timestamp since the barcode
     column in the local db has 'UNIQUE NOT NULL' property,
     meaning that the barcode field cannot be empty.
@@ -248,10 +276,12 @@ pub fn insert_custom_food(
 }
 
 pub fn set_daily_goals(goal: &DailyMacroGoal) -> Result<()> {
-    let conn = get_connection()?;
+    write_daily_goals(&get_connection()?, goal)
+}
 
+fn write_daily_goals(conn: &Connection, goal: &DailyMacroGoal) -> Result<()> {
     conn.execute(
-        "INSERT OR REPLACE INTO daily_goals (id, target_kcal, target_proteins, target_carbohydrates, target_fat)
+        "INSERT OR REPLACE INTO user_settings (id, target_kcal, target_proteins, target_carbohydrates, target_fat)
             VALUES (1, ?1, ?2, ?3, ?4)",
         params![
             goal.target_kcal,
@@ -264,20 +294,104 @@ pub fn set_daily_goals(goal: &DailyMacroGoal) -> Result<()> {
 }
 
 pub fn get_daily_goals() -> Result<Option<DailyMacroGoal>> {
-    let conn = get_connection()?;
+    read_daily_goals(&get_connection()?)
+}
 
+fn read_daily_goals(conn: &Connection) -> Result<Option<DailyMacroGoal>> {
     let mut stmt = conn.prepare(
         "SELECT target_kcal, target_proteins, target_carbohydrates, target_fat 
-            FROM daily_goals WHERE id = 1"
+            FROM user_settings WHERE id = 1",
     )?;
 
-    let goal = stmt.query_row([], |row| {
-        Ok(DailyMacroGoal {
-            target_kcal: row.get(0)?,
-            target_proteins: row.get(1)?,
-            target_carbohydrates: row.get(2)?,
-            target_fat: row.get(3)?,
+    let goal = stmt
+        .query_row([], |row| {
+            Ok(DailyMacroGoal {
+                target_kcal: row.get(0)?,
+                target_proteins: row.get(1)?,
+                target_carbohydrates: row.get(2)?,
+                target_fat: row.get(3)?,
+            })
         })
-    }).optional()?; // Returns 'Ok(None)' if user hasn't set any goals
+        .optional()?; // Returns 'Ok(None)' if user hasn't set any goals
     Ok(goal)
+}
+
+#[cfg(test)]
+mod settings_tests {
+    use super::*;
+
+    #[test]
+    fn goals_persist_across_connections_and_replace_the_single_row() {
+        // Use a temporary database rather than touching the user's working database.
+        let path = std::env::temp_dir().join(format!(
+            "ultimate-macro-settings-{}-{}.db",
+            std::process::id(),
+            SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .unwrap()
+                .as_nanos()
+        ));
+        {
+            let conn = Connection::open(&path).unwrap();
+            init_user_settings(&conn).unwrap();
+            assert!(read_daily_goals(&conn).unwrap().is_none());
+            let mut goal = DailyMacroGoal {
+                target_kcal: 2200.0,
+                target_proteins: 120.5,
+                target_carbohydrates: 260.0,
+                target_fat: 0.0,
+            };
+            write_daily_goals(&conn, &goal).unwrap();
+            goal.target_kcal = 2400.0;
+            write_daily_goals(&conn, &goal).unwrap();
+        }
+        {
+            let conn = Connection::open(&path).unwrap();
+            init_user_settings(&conn).unwrap();
+            let goal = read_daily_goals(&conn).unwrap().unwrap();
+            assert_eq!(
+                (
+                    goal.target_kcal,
+                    goal.target_proteins,
+                    goal.target_carbohydrates,
+                    goal.target_fat
+                ),
+                (2400.0, 120.5, 260.0, 0.0)
+            );
+            let count: i64 = conn
+                .query_row("SELECT COUNT(*) FROM user_settings", [], |r| r.get(0))
+                .unwrap();
+            assert_eq!(count, 1);
+        }
+        std::fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn legacy_goals_migrate_without_overwriting_new_settings() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE daily_goals (id INTEGER PRIMARY KEY, target_kcal REAL,
+            target_proteins REAL, target_carbohydrates REAL, target_fat REAL);
+            INSERT INTO daily_goals VALUES (1, 2000, 100, 250, 60);",
+        )
+        .unwrap();
+        init_user_settings(&conn).unwrap();
+        let mut goal = read_daily_goals(&conn).unwrap().unwrap();
+        assert_eq!(
+            (
+                goal.target_kcal,
+                goal.target_proteins,
+                goal.target_carbohydrates,
+                goal.target_fat
+            ),
+            (2000.0, 100.0, 250.0, 60.0)
+        );
+        goal.target_kcal = 2300.0;
+        write_daily_goals(&conn, &goal).unwrap();
+        init_user_settings(&conn).unwrap();
+        assert_eq!(
+            read_daily_goals(&conn).unwrap().unwrap().target_kcal,
+            2300.0
+        );
+    }
 }
