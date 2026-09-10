@@ -1,9 +1,9 @@
 use crate::models::FoodItem;
-use serde::Deserialize;
 use reqwest::header::USER_AGENT;
+use serde::Deserialize;
 
 // --- API Response Structures ---
-// Using serde we can ignore the massive amount of data we get 
+// Using serde we can ignore the massive amount of data we get
 // from openfoodfacts.org/api and only extract what we need
 //
 // If you want to get more information you can check a random barcode against
@@ -36,36 +36,43 @@ struct OffNutriments {
 
 // Fetch data from API using a barcode
 pub async fn fetch_food_by_barcode(barcode: &str) -> Result<FoodItem, String> {
-    let url = format!("https://world.openfoodfacts.org/api/v0/product/{}.json", barcode);
+    let url = format!(
+        "https://world.openfoodfacts.org/api/v0/product/{}.json",
+        barcode
+    );
 
-    let client = reqwest::Client::new();
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(20))
+        .build()
+        .map_err(|e| e.to_string())?;
 
     // Define User-Agent to comply with Open Food Facts API ToS
     // Format: AppName - System - Version - ContactInfo
-    let custom_user_agent = "UltimateMacro - Android/Linux - Version 0.1 - https://github.com/Rainer-2904";
+    let custom_user_agent =
+        "UltimateMacro - Android/Linux - Version 0.1 - https://github.com/Rainer-2904";
 
     // Make request with header
     let response = client
-    .get(&url)
-    .header(USER_AGENT, custom_user_agent)
-    .send()
-    .await
-    .map_err(|e| format!("Failed to send request: {}", e))?;
+        .get(&url)
+        .header(USER_AGENT, custom_user_agent)
+        .send()
+        .await
+        .map_err(|e| format!("Failed to send request: {}", e))?;
 
     // Parse into 'OffResponse'
     let api_data = response
-    .json::<OffResponse>()
-    .await
-    .map_err(|e| format!("Failed to parse JSON: {}", e))?;
+        .json::<OffResponse>()
+        .await
+        .map_err(|e| format!("Failed to parse JSON: {}", e))?;
 
     // Check if product is available in openfoodfacts db
     if api_data.status != 1 {
-        return Err(format!("Product with barcode {} not found", barcode))
+        return Err(format!("Product with barcode {} not found", barcode));
     }
 
     let product = api_data
-    .product
-    .ok_or_else(|| "Product data is missing from response".to_string())?;
+        .product
+        .ok_or_else(|| "Product data is missing from response".to_string())?;
 
     let nutriments = product.nutriments.unwrap_or(OffNutriments {
         kcal: None,
@@ -74,13 +81,16 @@ pub async fn fetch_food_by_barcode(barcode: &str) -> Result<FoodItem, String> {
         fat: None,
     });
 
-
     // Map the API data to the structure in models.rs
     // Using unwrap_or as a fallback in case of incomplete labels
     let food_item = FoodItem {
         id: None, // As it will be assigned automatically by SQLite
-        product_name: product.product_name.unwrap_or_else(|| "Unknown Product".to_string()),
-        brand: product.brands.unwrap_or_else(|| "Unknown Brand".to_string()),
+        product_name: product
+            .product_name
+            .unwrap_or_else(|| "Unknown Product".to_string()),
+        brand: product
+            .brands
+            .unwrap_or_else(|| "Unknown Brand".to_string()),
         barcode: barcode.to_string(),
         kcal: nutriments.kcal.unwrap_or(0.0),
         proteins: nutriments.proteins.unwrap_or(0.0),

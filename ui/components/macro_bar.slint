@@ -21,7 +21,8 @@ export component MacroBar inherits Rectangle {
             }
             Rectangle {} // Spacer
             Text {
-                text: round(root.current) + "/" + round(root.max) + root.unit;
+                // Without a positive target, show consumption alone.
+                text: root.max > 0 ? round(root.current) + "/" + round(root.max) + root.unit : round(root.current) + root.unit;
                 color: #bac2de;
                 font-size: 14px;
             }

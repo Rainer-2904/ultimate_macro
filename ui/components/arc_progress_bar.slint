@@ -155,7 +155,8 @@ export component ArcProgressBar inherits Rectangle {
             VerticalLayout {
                 alignment: start;
                 Text {
-                    text: max(0, round(arc.max - arc.current)) + arc.unit + " to go";
+                    // Missing targets show consumed amounts instead of a misleading remainder.
+                    text: arc.max > 0 ? max(0, round(arc.max - arc.current)) + arc.unit + " to go" : round(arc.current) + arc.unit;
                     color: #bac2de;
                     font-size: 16px;
                     font-weight: 600;

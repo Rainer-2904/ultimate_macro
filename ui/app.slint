@@ -1,9 +1,16 @@
+import { ScannerOverlay } from "components/scanner_overlay.slint";
+import { LogDisplayData } from "components/log_item.slint";
+import { MacroValues } from "types.slint";
+// Re-export shared types so Slint generates their Rust bindings.
+export { LogDisplayData } from "components/log_item.slint";
+
+export { MacroValues } from "types.slint";
+
 // --- UI IS NOT SCALABLE YET --- \\
 // ---   PROOF OF CONCEPT  --- \\
 
 import { Footer } from "components/footer.slint";
 import { HomeTab } from "tabs/home_tab.slint";
-import { ScanTab } from "tabs/scan_tab.slint";
 import { ChartTab } from "tabs/chart_tab.slint";
 import { SettingsTab } from "tabs/settings_tab.slint";
 
@@ -13,18 +20,83 @@ export component MainWindow inherits Window {
     title: "Ultimate Macro";
     background: #1e1e2e;
 
+    // Tab indices match Footer: 0 = Home, 1 = Charts, 2 = Settings.
+    // Scanning is opened from the Home tab add button.
     in-out property <int> active-tab: 0;
+    // Keep database-backed state on the window: HomeTab is recreated when switching tabs.
+    // Rust supplies these properties through refresh_dashboard().
+    in property <MacroValues> totals;
+    in property <MacroValues> goals;
+    in property <bool> has-goals: false;
+    in property <[LogDisplayData]> food-log;
+    in property <string> dashboard-error;
+    // The overlay belongs to the window to block navigation during confirmation.
+    in property <bool> scanner-visible;
+    in property <bool> scanner-busy;
+    in property <bool> scanner-ready;
+    in property <bool> camera-available;
+    in-out property <string> scanner-barcode;
+    in-out property <string> scanner-quantity;
+    in property <string> scanner-product;
+    in property <string> scanner-status-text;
+    callback close-scanner();
+    callback start-camera();
+    callback lookup-barcode(string);
+    callback barcode-edited();
+    callback confirm-food(string);
+
+    // Drafts live on the window so navigating between tabs preserves unsaved edits.
+    in-out property <string> goal-proteins;
+    in-out property <string> goal-carbohydrates;
+    in-out property <string> goal-fat;
+    in-out property <string> goal-kcal;
+    in-out property <string> settings-status;
+    in property <bool> settings-error: false;
+    callback save-goals(string, string, string, string);
+    callback open-scanner();
 
     VerticalLayout {
         Rectangle {
-            if (root.active-tab == 0) : HomeTab {}
-            if (root.active-tab == 1) : ScanTab {}
-            if (root.active-tab == 2) : ChartTab {}
-            if (root.active-tab == 3) : SettingsTab {}
+            if (root.active-tab == 0) : HomeTab {
+                totals: root.totals;
+                goals: root.goals;
+                has-goals: root.has-goals;
+                food-log: root.food-log;
+                dashboard-error: root.dashboard-error;
+                open-scanner => {
+                    root.open-scanner()
+                }
+            }
+            if (root.active-tab == 1) : ChartTab {}
+            if (root.active-tab == 2) : SettingsTab {
+                proteins <=> root.goal-proteins;
+                carbohydrates <=> root.goal-carbohydrates;
+                fat <=> root.goal-fat;
+                kcal <=> root.goal-kcal;
+                status <=> root.settings-status;
+                has-error: root.settings-error;
+                save-goals => {
+                    root.save-goals(root.goal-proteins, root.goal-carbohydrates, root.goal-fat, root.goal-kcal);
+                }
+            }
         }
         // Footer
         Footer {
             active-tab <=> root.active-tab;
         }
+    }
+    if root.scanner-visible : ScannerOverlay {
+        barcode <=> root.scanner-barcode;
+        quantity <=> root.scanner-quantity;
+        product: root.scanner-product;
+        status-text: root.scanner-status-text;
+        busy: root.scanner-busy;
+        ready: root.scanner-ready;
+        camera-available: root.camera-available;
+        close => { root.close-scanner(); }
+        start-camera => { root.start-camera(); }
+        lookup => { root.lookup-barcode(root.scanner-barcode); }
+        barcode-edited => { root.barcode-edited(); }
+        confirm => { root.confirm-food(root.scanner-quantity); }
     }
 }
