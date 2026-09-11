@@ -75,10 +75,7 @@ fn lookup(ui: &MainWindow, state: Arc<Mutex<State>>, input: &str) {
                 }
                 Err(error) => {
                     log::error!("Barcode lookup failed: {error}");
-                    ui.set_scanner_status_text(
-                        "Could not find product. Check the barcode and connection, then retry."
-                            .into(),
-                    );
+                    ui.set_scanner_status_text(error.into());
                 }
             }
         });

@@ -19,18 +19,6 @@ fn android_main(app: slint::android::AndroidApp) {
         return;
     };
     crate::storage::init(data_dir);
-    // Reqwest's default TLS backend uses Android's certificate verifier. Its
-    // Java companion is packaged by Gradle and must be initialized before HTTP.
-    let tls_vm = unsafe { jni_platform::JavaVM::from_raw(app.vm_as_ptr().cast()) };
-    let tls_init = tls_vm.attach_current_thread_for_scope(|env| {
-        let context =
-            unsafe { jni_platform::objects::JObject::from_raw(env, app.activity_as_ptr().cast()) };
-        rustls_platform_verifier::android::init_with_env(env, context)
-    });
-    if let Err(error) = tls_init {
-        eprintln!("Failed to initialize Android TLS: {error}");
-        return;
-    }
     // android-activity owns these pointers for the activity lifetime. Promote the
     // borrowed Activity to a global JNI reference before leaving this JNI scope.
     let bridge = (|| -> Result<Bridge, jni::errors::Error> {

@@ -42,11 +42,14 @@ Release signing and Play Store distribution are not configured.
 - The user supplies grams and presses **Add to today's log** to record consumption.
 - Closing the form invalidates pending lookup results. Scanning alone never logs food.
 - Settings, food cache and logs live in `files/ultimate_macro.db` in private app
-  storage; `files/app.log` is rewritten each launch. Desktop uses the launch directory.
+  storage; `files/app.log` appends across launches for troubleshooting. Desktop uses the launch directory.
 - `src/android.rs` calls Java through JNI. `startScan` dispatches to Android's UI
   thread; `takeScanResult` transfers one result back to Slint's event loop.
-- Reqwest uses Android system certificate verification. Gradle locates its JVM
-  companion through Cargo metadata; `android_main` initializes it before requests.
+- Android HTTPS uses Rustls/WebPKI with bundled Mozilla trust roots. Certificate
+  chain, expiry and hostname checks stay enabled. Keep `webpki-root-certs` updated
+  when releasing the app; OS-installed private CAs and OS revocation checks are
+  not used for the public Open Food Facts endpoint. This avoids the platform
+  verifier's OCSP failure on the tested device.
 - Shared app initialization and settings callbacks now live in `src/lib.rs`;
   `src/main.rs` is the desktop launcher. `src/scanner.rs` owns the form workflow.
 
