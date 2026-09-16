@@ -1,5 +1,9 @@
 // Presentation strings prepared in Rust; calculations use the numeric domain models.
 export struct LogDisplayData {
+    log-id: string,
+    food-id: string,
+    barcode: string,
+    favorite: bool,
     name: string,
     details: string,
     calories: string,
@@ -9,6 +13,10 @@ export struct LogDisplayData {
 }
 
 export component LogItem inherits Rectangle {
+    in property <bool> favorite;
+    callback toggle-favorite();
+    in property <bool> selectable: false;
+    callback selected();
     in property <string> name;
     in property <string> details;
     in property <string> proteins;
@@ -20,9 +28,30 @@ export component LogItem inherits Rectangle {
     background: #181825;
     border-radius: 12px;
 
+    TouchArea {
+        enabled: root.selectable;
+        clicked => { root.selected(); }
+    }
+
     HorizontalLayout {
         padding: 12px;
         alignment: space-between;
+        spacing: 8px;
+
+        Rectangle {
+            width: 40px;
+            Image {
+                source: root.favorite ? @image-url("../icons/star.svg") : @image-url("../icons/star_outline.svg");
+                width: 24px;
+                height: 24px;
+                x: (parent.width - self.width) / 2;
+                y: (parent.height - self.height) / 2;
+                colorize: root.favorite ? #dbb015 : #a6adc8;
+            }
+            TouchArea {
+                clicked => { root.toggle-favorite(); }
+            }
+        }
 
         // Left side containing item
         VerticalLayout {

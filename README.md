@@ -8,4 +8,4 @@ cargo test
 ```
 
 Desktop supports manual barcode lookup and quantity confirmation. Android adds a
-camera scanner; see [Android setup and device checks](android/README.md).
+camera scanner; see [APK building, ADB installation, and device checks](android/README.md).

@@ -25,5 +25,4 @@ slint = "1.17.0"
 [target.'cfg(target_os = "android")'.dependencies]
 slint = { version = "1.17.0", default-features = false, features = ["std", "compat-1-2", "backend-android-activity-06"] }
 jni = "0.21.1"
-rustls-platform-verifier = "0.7.0"
-jni-platform = { package = "jni", version = "0.22.4" }
+webpki-root-certs = "1.0.9"

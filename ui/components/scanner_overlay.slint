@@ -1,6 +1,35 @@
 import { Button } from "std-widgets.slint";
 import { LineEdit } from "line_edit.slint";
 
+component ScannerButton inherits Button {
+    min-height: 56px;
+    preferred-height: 56px;
+}
+
+export component DeleteButton inherits Rectangle {
+    in property <string> text;
+    in property <bool> enabled: true;
+    callback clicked();
+    min-height: 56px;
+    preferred-height: 56px;
+    border-radius: 8px;
+    background: !root.enabled ? #583039 : touch.pressed ? #922b3e : #b5364e;
+    accessible-role: button;
+    accessible-label: root.text;
+    accessible-action-default => { if root.enabled { root.clicked(); } }
+    Text {
+        text: root.text;
+        color: #ffffff;
+        horizontal-alignment: center;
+        vertical-alignment: center;
+        font-size: 16px;
+    }
+    touch := TouchArea {
+        enabled: root.enabled;
+        clicked => { root.clicked(); }
+    }
+}
+
 // Android supplies a native camera screen. This overlay handles lookup and
 // explicit quantity confirmation, and provides manual entry on every platform.
 export component ScannerOverlay inherits Rectangle {
@@ -10,6 +39,9 @@ export component ScannerOverlay inherits Rectangle {
     in property <string> status-text;
     in property <bool> busy;
     in property <bool> ready;
+    in property <bool> editing;
+    private property <bool> confirm-delete: false;
+    callback delete-entry();
     in property <bool> camera-available;
     callback close();
     callback start-camera();
@@ -21,30 +53,73 @@ export component ScannerOverlay inherits Rectangle {
     VerticalLayout {
         padding: 24px;
         spacing: 16px;
-        alignment: start;
-        Text { text: "Add food"; color: #cdd6f4; font-size: 26px; font-weight: 700; }
-        if root.camera-available : Button {
-            text: "Scan barcode";
-            enabled: !root.busy;
-            clicked => { root.start-camera(); }
+        padding-top: 50px;
+        Text { text: root.editing ? "Edit logged food" : "Add food"; color: #cdd6f4; font-size: 26px; font-weight: 700; }
+        Flickable {
+            vertical-stretch: 1;
+            min-height: 0px;
+            interactive: true;
+            viewport-width: self.width;
+            viewport-height: form.preferred-height;
+
+            form := VerticalLayout {
+                spacing: 16px;
+                alignment: start;
+                Rectangle { height: 10px; background: #181825; width: 100%; }
+                if root.camera-available && !root.editing : ScannerButton {
+                    text: "Scan barcode";
+                    enabled: !root.busy;
+                    clicked => { root.start-camera(); }
+                }
+
+                if !root.editing : LineEdit {
+                    text <=> root.barcode;
+                    placeholder-text: "Enter product barcode";
+                    input-type: number;
+                    enabled: !root.busy;
+                    edited => { root.barcode-edited(); }
+                }
+                if !root.editing : ScannerButton { text: "Find product"; enabled: !root.busy; clicked => { root.lookup(); } }
+                Text { text: root.status-text; color: #a6adc8; wrap: word-wrap; }
+                if root.ready : Text { text: root.product; color: #cdd6f4; wrap: word-wrap; font-size: 20px; }
+                Text { text: "Consumed quantity (g)"; color: #a6adc8; }
+                LineEdit { text <=> root.quantity; placeholder-text: "e.g. 100"; input-type: decimal; enabled: !root.busy; }
+                if root.ready : VerticalLayout {
+                    spacing: 16px;
+                    ScannerButton { text: root.editing ? "Save quantity" : "Add to today's log"; enabled: !root.busy; clicked => { root.confirm(); } }
+                    if root.editing : Rectangle { height: 50px; }
+                    if root.editing : DeleteButton { text: "Delete log entry"; enabled: !root.busy; clicked => { root.confirm-delete = true; } }
+                }
+            }
         }
-        Text { text: "Barcode"; color: #a6adc8; }
-        LineEdit {
-            text <=> root.barcode;
-            placeholder-text: "Enter product barcode";
-            input-type: number;
-            enabled: !root.busy;
-            edited => { root.barcode-edited(); }
+
+        ScannerButton { text: "Cancel"; clicked => { root.close(); } }
+    }
+    if root.confirm-delete : Rectangle {
+        background: #00000099;
+        TouchArea {} // Keep the edit form blocked until the user chooses an action.
+        Rectangle {
+            width: min(360px, parent.width - 48px);
+            height: confirmation.preferred-height;
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            background: #313244;
+            border-radius: 12px;
+            confirmation := VerticalLayout {
+                padding: 20px;
+                spacing: 16px;
+                Text { text: "Delete log entry?"; color: #cdd6f4; font-size: 22px; font-weight: 700; }
+                Text { text: "This removes this entry from your Daily Log. This cannot be undone."; color: #cdd6f4; wrap: word-wrap; }
+                ScannerButton { text: "Keep entry"; clicked => { root.confirm-delete = false; } }
+                DeleteButton {
+                    text: "Delete entry";
+                    enabled: !root.busy;
+                    clicked => {
+                        root.confirm-delete = false;
+                        root.delete-entry();
+                    }
+                }
+            }
         }
-        Button { text: "Find product"; enabled: !root.busy; clicked => { root.lookup(); } }
-        Text { text: root.status-text; color: #a6adc8; wrap: word-wrap; }
-        if root.ready : VerticalLayout {
-            spacing: 16px;
-            Text { text: root.product; color: #cdd6f4; wrap: word-wrap; font-size: 20px; }
-            Text { text: "Consumed quantity (g)"; color: #a6adc8; }
-            LineEdit { text <=> root.quantity; placeholder-text: "e.g. 100"; input-type: decimal; }
-            Button { text: "Add to today's log"; enabled: !root.busy; clicked => { root.confirm(); } }
-        }
-        Button { text: "Cancel"; clicked => { root.close(); } }
     }
 }

@@ -41,10 +41,23 @@ pub async fn fetch_food_by_barcode(barcode: &str) -> Result<FoodItem, String> {
         barcode
     );
 
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(20))
-        .build()
-        .map_err(|e| e.to_string())?;
+    let builder = reqwest::Client::builder().timeout(std::time::Duration::from_secs(20));
+    // Android's platform verifier rejects some valid server chains when OCSP
+    // metadata is absent. Use Rustls/WebPKI with Mozilla roots consistently for
+    // this public API; hostname, expiry, signatures and chain validation remain
+    // enabled. Keep webpki-root-certs updated with application releases.
+    #[cfg(target_os = "android")]
+    let builder = builder.tls_certs_only(
+        webpki_root_certs::TLS_SERVER_ROOT_CERTS
+            .iter()
+            .map(|certificate| reqwest::Certificate::from_der(certificate.as_ref()))
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|e| format!("Could not load certificate trust roots: {e}"))?,
+    );
+    let client = builder.build().map_err(|e| {
+        log::error!("Failed to create HTTP client: {e:?}");
+        "Could not initialize a secure connection.".to_string()
+    })?;
 
     // Define User-Agent to comply with Open Food Facts API ToS
     // Format: AppName - System - Version - ContactInfo
@@ -57,13 +70,29 @@ pub async fn fetch_food_by_barcode(barcode: &str) -> Result<FoodItem, String> {
         .header(USER_AGENT, custom_user_agent)
         .send()
         .await
-        .map_err(|e| format!("Failed to send request: {}", e))?;
+        .map_err(|e| {
+            // Debug preserves the nested TLS/DNS cause; Display only shows the URL.
+            log::error!("Open Food Facts request failed for {barcode}: {e:?}");
+            if e.is_timeout() {
+                "Open Food Facts timed out. Please retry.".to_string()
+            } else {
+                "Could not connect to Open Food Facts. Check your connection and retry.".to_string()
+            }
+        })?;
+
+    // Do not attempt to parse an HTTP error page as a product response.
+    if !response.status().is_success() {
+        return Err(format!(
+            "Open Food Facts returned HTTP {}. Please retry later.",
+            response.status()
+        ));
+    }
 
     // Parse into 'OffResponse'
-    let api_data = response
-        .json::<OffResponse>()
-        .await
-        .map_err(|e| format!("Failed to parse JSON: {}", e))?;
+    let api_data = response.json::<OffResponse>().await.map_err(|e| {
+        log::error!("Invalid Open Food Facts response for {barcode}: {e:?}");
+        "Open Food Facts returned product data the app could not read.".to_string()
+    })?;
 
     // Check if product is available in openfoodfacts db
     if api_data.status != 1 {
@@ -84,6 +113,7 @@ pub async fn fetch_food_by_barcode(barcode: &str) -> Result<FoodItem, String> {
     // Map the API data to the structure in models.rs
     // Using unwrap_or as a fallback in case of incomplete labels
     let food_item = FoodItem {
+        favorite: false,
         id: None, // As it will be assigned automatically by SQLite
         product_name: product
             .product_name
@@ -99,4 +129,40 @@ pub async fn fetch_food_by_barcode(barcode: &str) -> Result<FoodItem, String> {
         standard_portion: 100.0, // OpenFoodFacts only uses per 100g, if using another DB check to make sure
     };
     Ok(food_item)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_known_zuzu_product_response() {
+        // Relevant fields from OFF barcode 5941355009346. The reported device
+        // failure was TLS setup, not an absent product or invalid nutrition data.
+        let response: OffResponse = serde_json::from_str(
+            r#"{
+            "status": 1,
+            "product": {
+                "product_name": "lapte ZUZU  1,8l ..1,5grasime",
+                "brands": "zuzu",
+                "nutriments": {"energy-kcal_100g": 44, "proteins_100g": 3.1,
+                    "carbohydrates_100g": 4.5, "fat_100g": 1.5}
+            }
+        }"#,
+        )
+        .unwrap();
+        assert_eq!(response.status, 1);
+        let product = response.product.unwrap();
+        assert_eq!(product.brands.as_deref(), Some("zuzu"));
+        let nutrients = product.nutriments.unwrap();
+        assert_eq!(
+            (
+                nutrients.kcal,
+                nutrients.proteins,
+                nutrients.carbohydrates,
+                nutrients.fat
+            ),
+            (Some(44.0), Some(3.1), Some(4.5), Some(1.5))
+        );
+    }
 }

@@ -11,6 +11,7 @@ export component SettingsTab inherits Rectangle {
     callback save-goals();
 
     VerticalLayout {
+        padding-top: 50px;
         padding: 24px;
         spacing: 16px;
         alignment: start;
@@ -29,7 +30,11 @@ export component SettingsTab inherits Rectangle {
         LineEdit { text <=> root.fat; placeholder-text: "e.g. 70"; edited => { root.status = ""; } }
         Text { text: "Kcal"; color: #dbb015; }
         LineEdit { text <=> root.kcal; placeholder-text: "e.g. 2500"; edited => { root.status = ""; } }
-        Button { text: "Save goals"; clicked => { root.save-goals(); } }
+        Button {
+            min-height: 56px;
+            preferred-height: 56px;
+            text: "Save goals"; clicked => { root.save-goals(); } 
+            }
         Text {
             text: root.status;
             color: root.has-error ? #f38ba8 : #a6e3a1;

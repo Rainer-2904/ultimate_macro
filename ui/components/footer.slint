@@ -21,14 +21,19 @@ export component Footer inherits Rectangle {
             clicked => { root.active-tab = 0; }
         }
         TabItem {
-            icon: @image-url("../icons/chart-pie-3.svg");
+            icon: @image-url("../icons/star.svg");
             active: root.active-tab == 1;
             clicked => { root.active-tab = 1; }
         }
         TabItem {
-            icon: @image-url("../icons/settings.svg");
+            icon: @image-url("../icons/chart-pie-3.svg");
             active: root.active-tab == 2;
             clicked => { root.active-tab = 2; }
+        }
+        TabItem {
+            icon: @image-url("../icons/settings.svg");
+            active: root.active-tab == 3;
+            clicked => { root.active-tab = 3; }
         }
     }
 }

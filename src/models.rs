@@ -14,6 +14,8 @@ pub struct FoodItem {
     pub carbohydrates: f32,
     pub fat: f32,
     pub standard_portion: f32,
+    #[serde(default)]
+    pub favorite: bool,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -35,6 +37,8 @@ pub struct DailyMacroSummary {
 #[derive(Debug)]
 pub struct LogDisplayItem {
     pub log_id: i64,
+    pub food_id: i64,
+    pub favorite: bool,
     pub product_name: String,
     pub brand: String,
     pub quantity_in_grams: f32,

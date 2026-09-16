@@ -6,6 +6,7 @@ use std::sync::{Arc, Mutex};
 struct State {
     generation: u64,
     food: Option<FoodItem>,
+    log_id: Option<i64>,
 }
 
 // A generation invalidates in-flight lookups when the form is closed or edited.
@@ -14,6 +15,7 @@ fn reset(state: &Mutex<State>) -> u64 {
     let mut state = state.lock().unwrap();
     state.generation += 1;
     state.food = None;
+    state.log_id = None;
     state.generation
 }
 
@@ -75,10 +77,7 @@ fn lookup(ui: &MainWindow, state: Arc<Mutex<State>>, input: &str) {
                 }
                 Err(error) => {
                     log::error!("Barcode lookup failed: {error}");
-                    ui.set_scanner_status_text(
-                        "Could not find product. Check the barcode and connection, then retry."
-                            .into(),
-                    );
+                    ui.set_scanner_status_text(error.into());
                 }
             }
         });
@@ -94,14 +93,74 @@ pub fn connect(ui: &MainWindow) -> Timer {
         if let Some(ui) = weak.upgrade() {
             reset(&shared);
             ui.set_scanner_visible(true);
+            ui.set_scanner_editing(false);
             ui.set_scanner_busy(false);
             ui.set_scanner_ready(false);
             ui.set_scanner_barcode("".into());
             ui.set_scanner_quantity("".into());
             ui.set_scanner_product("".into());
             ui.set_scanner_status_text("Scan or enter a product barcode.".into());
-            if ui.get_camera_available() {
-                ui.invoke_start_camera();
+        }
+    });
+    let weak = ui.as_weak();
+    let shared = state.clone();
+    ui.on_open_favorite(move |barcode| {
+        let Some(ui) = weak.upgrade() else { return; };
+        ui.invoke_open_scanner();
+        ui.set_scanner_barcode(barcode.clone());
+        // Favorites are already cached, including custom foods with nonnumeric barcodes.
+        match crate::db::get_product_by_barcode(&barcode) {
+            Ok(Some(food)) => {
+                ui.set_scanner_product(format!("{} · {}", food.product_name, food.brand).into());
+                ui.set_scanner_status_text("Product found. Confirm how much you consumed.".into());
+                shared.lock().unwrap().food = Some(food);
+                ui.set_scanner_ready(true);
+            }
+            Ok(None) => ui.set_scanner_status_text("This food is no longer available.".into()),
+            Err(error) => {
+                log::error!("Failed to load favorite: {error}");
+                ui.set_scanner_status_text("Could not load this food. Please try again.".into());
+            }
+        }
+    });
+    let weak = ui.as_weak();
+    let shared = state.clone();
+    ui.on_edit_log(move |log_id| {
+        let Some(ui) = weak.upgrade() else { return; };
+        let Ok(log_id) = log_id.parse::<i64>() else { return; };
+        ui.invoke_open_scanner();
+        ui.set_scanner_editing(true);
+        match crate::db::get_log_entry(log_id) {
+            Ok(Some((product, grams))) => {
+                shared.lock().unwrap().log_id = Some(log_id);
+                ui.set_scanner_product(product.into());
+                ui.set_scanner_quantity(grams.to_string().into());
+                ui.set_scanner_status_text("Update the consumed quantity or delete this entry.".into());
+                ui.set_scanner_ready(true);
+            }
+            Ok(None) => ui.set_scanner_status_text("This log entry no longer exists.".into()),
+            Err(error) => {
+                log::error!("Failed to load log entry: {error}");
+                ui.set_scanner_status_text("Could not load this entry. Please try again.".into());
+            }
+        }
+    });
+    let weak = ui.as_weak();
+    let shared = state.clone();
+    ui.on_delete_log(move || {
+        let Some(ui) = weak.upgrade() else { return; };
+        if !ui.get_scanner_visible() || ui.get_scanner_busy() { return; }
+        let log_id = shared.lock().unwrap().log_id;
+        let Some(log_id) = log_id else { return; };
+        match crate::db::delete_log_entry(log_id) {
+            Ok(1) => {
+                ui.invoke_close_scanner();
+                crate::refresh_dashboard(&ui);
+            }
+            Ok(_) => ui.set_scanner_status_text("This log entry no longer exists.".into()),
+            Err(error) => {
+                log::error!("Failed to delete log entry: {error}");
+                ui.set_scanner_status_text("Could not delete this entry. Please try again.".into());
             }
         }
     });
@@ -146,6 +205,21 @@ pub fn connect(ui: &MainWindow) -> Timer {
                 return;
             }
         };
+        let log_id = shared.lock().unwrap().log_id;
+        if let Some(log_id) = log_id {
+            match crate::db::update_log_quantity(log_id, grams) {
+                Ok(1) => {
+                    ui.invoke_close_scanner();
+                    crate::refresh_dashboard(&ui);
+                }
+                Ok(_) => ui.set_scanner_status_text("This log entry no longer exists.".into()),
+                Err(error) => {
+                    log::error!("Failed to update log quantity: {error}");
+                    ui.set_scanner_status_text("Could not save quantity. Please try again.".into());
+                }
+            }
+            return;
+        }
         let mut state = shared.lock().unwrap();
         let Some(food_id) = state.food.as_ref().and_then(|food| food.id) else {
             return;
@@ -252,7 +326,9 @@ mod tests {
     #[test]
     fn closing_or_editing_invalidates_pending_lookup() {
         let state = Mutex::new(State::default());
+        state.lock().unwrap().log_id = Some(42);
         let first = reset(&state);
+        assert!(state.lock().unwrap().log_id.is_none());
         assert_ne!(first, reset(&state));
         assert!(state.lock().unwrap().food.is_none());
     }
