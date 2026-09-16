@@ -1,0 +1,54 @@
+import { LogItem, LogDisplayData } from "../components/log_item.slint";
+
+export component FavoritesTab inherits Rectangle {
+    background: transparent;
+    in property <[LogDisplayData]> favorite-foods;
+    in property <string> error-text;
+    callback toggle-favorite(string);
+    callback open-favorite(string);
+
+    VerticalLayout {
+        padding: 20px;
+        spacing: 20px;
+        padding-top: 50px;
+        Text {
+            text: "Favorites";
+            color: #cdd6f4;
+            font-size: 20px;
+            font-weight: 700;
+        }
+        Flickable {
+            vertical-stretch: 1;
+            min-height: 0px;
+            viewport-width: self.width;
+            viewport-height: favorites-list.preferred-height;
+
+            favorites-list := VerticalLayout {
+                spacing: 10px;
+                alignment: start;
+                if root.error-text != "" : Text {
+                    text: root.error-text;
+                    color: #f38ba8;
+                    wrap: word-wrap;
+                }
+                if root.favorite-foods.length == 0 && root.error-text == "" : Text {
+                    text: "No favorites yet. Tap a star in the Daily Log to save a food.";
+                    color: #a6adc8;
+                    wrap: word-wrap;
+                }
+                for item in root.favorite-foods : LogItem {
+                    selectable: true;
+                    selected => { root.open-favorite(item.barcode); }
+                    favorite: item.favorite;
+                    name: item.name;
+                    details: item.details;
+                    calories: item.calories;
+                    proteins: item.proteins;
+                    carbohydrates: item.carbohydrates;
+                    fats: item.fats;
+                    toggle-favorite => { root.toggle-favorite(item.food-id); }
+                }
+            }
+        }
+    }
+}

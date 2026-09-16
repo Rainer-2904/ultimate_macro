@@ -1,4 +1,5 @@
-import { ScannerOverlay } from "components/scanner_overlay.slint";
+import { Button } from "std-widgets.slint";
+import { ScannerOverlay, DeleteButton } from "components/scanner_overlay.slint";
 import { LogDisplayData } from "components/log_item.slint";
 import { MacroValues } from "types.slint";
 // Re-export shared types so Slint generates their Rust bindings.
@@ -6,11 +7,9 @@ export { LogDisplayData } from "components/log_item.slint";
 
 export { MacroValues } from "types.slint";
 
-// --- UI IS NOT SCALABLE YET --- \\
-// ---   PROOF OF CONCEPT  --- \\
-
 import { Footer } from "components/footer.slint";
 import { HomeTab } from "tabs/home_tab.slint";
+import { FavoritesTab } from "tabs/favorites_tab.slint";
 import { ChartTab } from "tabs/chart_tab.slint";
 import { SettingsTab } from "tabs/settings_tab.slint";
 
@@ -20,7 +19,7 @@ export component MainWindow inherits Window {
     title: "Ultimate Macro";
     background: #1e1e2e;
 
-    // Tab indices match Footer: 0 = Home, 1 = Charts, 2 = Settings.
+    // Tab indices match Footer: 0 = Home, 1 = Favorites, 2 = Charts, 3 = Settings.
     // Scanning is opened from the Home tab add button.
     in-out property <int> active-tab: 0;
     // Keep database-backed state on the window: HomeTab is recreated when switching tabs.
@@ -29,9 +28,14 @@ export component MainWindow inherits Window {
     in property <MacroValues> goals;
     in property <bool> has-goals: false;
     in property <[LogDisplayData]> food-log;
+    in property <[LogDisplayData]> favorite-foods;
+    in property <string> favorites-error;
     in property <string> dashboard-error;
     // The overlay belongs to the window to block navigation during confirmation.
     in property <bool> scanner-visible;
+    in property <bool> scanner-editing;
+    callback edit-log(string);
+    callback delete-log();
     in property <bool> scanner-busy;
     in property <bool> scanner-ready;
     in property <bool> camera-available;
@@ -54,6 +58,9 @@ export component MainWindow inherits Window {
     in property <bool> settings-error: false;
     callback save-goals(string, string, string, string);
     callback open-scanner();
+    callback toggle-favorite(string);
+    private property <string> pending-favorite-removal: "";
+    callback open-favorite(string);
 
     VerticalLayout {
         Rectangle {
@@ -62,13 +69,27 @@ export component MainWindow inherits Window {
                 goals: root.goals;
                 has-goals: root.has-goals;
                 food-log: root.food-log;
+                edit-log(log-id) => { root.edit-log(log-id); }
+                toggle-favorite(food-id, is-favorite) => {
+                    if is-favorite {
+                        root.pending-favorite-removal = food-id;
+                    } else {
+                        root.toggle-favorite(food-id);
+                    }
+                }
                 dashboard-error: root.dashboard-error;
                 open-scanner => {
                     root.open-scanner()
                 }
             }
-            if (root.active-tab == 1) : ChartTab {}
-            if (root.active-tab == 2) : SettingsTab {
+            if (root.active-tab == 1) : FavoritesTab {
+                favorite-foods: root.favorite-foods;
+                error-text: root.favorites-error;
+                open-favorite(barcode) => { root.open-favorite(barcode); }
+                toggle-favorite(food-id) => { root.pending-favorite-removal = food-id; }
+            }
+            if (root.active-tab == 2) : ChartTab {}
+            if (root.active-tab == 3) : SettingsTab {
                 proteins <=> root.goal-proteins;
                 carbohydrates <=> root.goal-carbohydrates;
                 fat <=> root.goal-fat;
@@ -92,6 +113,8 @@ export component MainWindow inherits Window {
         status-text: root.scanner-status-text;
         busy: root.scanner-busy;
         ready: root.scanner-ready;
+        editing: root.scanner-editing;
+        delete-entry => { root.delete-log(); }
         camera-available: root.camera-available;
         close => { root.close-scanner(); }
         start-camera => { root.start-camera(); }
@@ -99,4 +122,36 @@ export component MainWindow inherits Window {
         barcode-edited => { root.barcode-edited(); }
         confirm => { root.confirm-food(root.scanner-quantity); }
     }
+    if root.pending-favorite-removal != "" : Rectangle {
+        background: #00000099;
+        TouchArea {} // Block the list and footer while confirmation is open.
+        Rectangle {
+            width: min(360px, parent.width - 48px);
+            height: confirmation.preferred-height;
+            x: (parent.width - self.width) / 2;
+            y: (parent.height - self.height) / 2;
+            background: #313244;
+            border-radius: 12px;
+            confirmation := VerticalLayout {
+                padding: 20px;
+                spacing: 16px;
+                Text { text: "Remove favorite?"; color: #cdd6f4; font-size: 22px; font-weight: 700; }
+                Text { text: "Remove this food from Favorites? Your Daily Log entries will be kept."; color: #cdd6f4; wrap: word-wrap; }
+                Button {
+                    text: "Keep favorite";
+                    min-height: 56px;
+                    preferred-height: 56px;
+                    clicked => { root.pending-favorite-removal = ""; }
+                }
+                DeleteButton {
+                    text: "Remove favorite";
+                    clicked => {
+                        root.toggle-favorite(root.pending-favorite-removal);
+                        root.pending-favorite-removal = "";
+                    }
+                }
+            }
+        }
+    }
+
 }

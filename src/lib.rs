@@ -17,6 +17,7 @@ slint::include_modules!();
 /// Call after successful consumption writes and, when implemented, log edits/deletes
 /// or goal changes. There is currently no midnight timer to trigger a date rollover.
 fn refresh_dashboard(ui: &MainWindow) {
+    refresh_favorites(ui);
     // Finish all reads before changing UI properties so a failed query leaves the
     // previous display intact. These separate queries are not a database snapshot.
     let result = (|| -> rusqlite::Result<_> {
@@ -55,6 +56,10 @@ fn refresh_dashboard(ui: &MainWindow) {
             let rows: Vec<LogDisplayData> = items
                 .into_iter()
                 .map(|item| LogDisplayData {
+                    log_id: item.log_id.to_string().into(),
+                    food_id: item.food_id.to_string().into(),
+                    barcode: Default::default(),
+                    favorite: item.favorite,
                     name: item.product_name.into(),
                     details: format!("{}g · {}", item.quantity_in_grams, item.brand).into(),
                     calories: format!("{:.0}", item.specific_macros.kcal).into(),
@@ -69,6 +74,32 @@ fn refresh_dashboard(ui: &MainWindow) {
         Err(e) => {
             error!("Failed to refresh dashboard: {}", e);
             ui.set_dashboard_error("Could not load today's food data.".into());
+        }
+    }
+}
+
+// Favorites belong to foods, independently of when or how often they were logged.
+fn refresh_favorites(ui: &MainWindow) {
+    match db::get_favorite_foods() {
+        Ok(foods) => {
+            let rows: Vec<LogDisplayData> = foods.into_iter().map(|food| LogDisplayData {
+                log_id: Default::default(),
+                food_id: food.id.expect("Stored foods have an ID").to_string().into(),
+                barcode: food.barcode.into(),
+                favorite: food.favorite,
+                name: food.product_name.into(),
+                details: format!("{}g · {}", food.standard_portion, food.brand).into(),
+                calories: format!("{:.0}", food.kcal).into(),
+                proteins: format!("{:.0}", food.proteins).into(),
+                carbohydrates: format!("{:.0}", food.carbohydrates).into(),
+                fats: format!("{:.0}", food.fat).into(),
+            }).collect();
+            ui.set_favorite_foods(ModelRc::new(VecModel::from(rows)));
+            ui.set_favorites_error("".into());
+        }
+        Err(e) => {
+            error!("Failed to load favorites: {e}");
+            ui.set_favorites_error("Could not load favorites. Please try again.".into());
         }
     }
 }
@@ -147,6 +178,19 @@ pub async fn run() {
                 ui.set_settings_status("Daily goals saved.".into());
             }
             Err(message) => ui.set_settings_status(message.into()),
+        }
+    });
+    let favorite_handle = ui.as_weak();
+    ui.on_toggle_favorite(move |food_id| {
+        let Some(ui) = favorite_handle.upgrade() else { return; };
+        let result = food_id.parse::<i64>().ok().map(db::toggle_food_favorite);
+        match result {
+            Some(Ok(1)) => refresh_dashboard(&ui),
+            other => {
+                error!("Failed to toggle favorite: {other:?}");
+                ui.set_dashboard_error("Could not update favorite. Please try again.".into());
+                ui.set_favorites_error("Could not update favorite. Please try again.".into());
+            }
         }
     });
     let _scanner_timer = scanner::connect(&ui);

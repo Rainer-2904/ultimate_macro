@@ -24,10 +24,13 @@ pub fn init_db() -> Result<()> {
         proteins REAL NOT NULL,
         carbohydrates REAL NOT NULL,
         fat REAL NOT NULL,
-        standard_portion REAL NOT NULL
+        standard_portion REAL NOT NULL,
+        favorite INTEGER NOT NULL DEFAULT 0 CHECK (favorite IN (0, 1))
     )",
         [],
     )?;
+
+    migrate_food_favorite(&conn)?;
 
     // Create log table for consumption history
     conn.execute(
@@ -43,6 +46,29 @@ pub fn init_db() -> Result<()> {
 
     init_user_settings(&conn)?;
     Ok(())
+}
+
+// SQLite stores booleans as 0/1. Append the column to existing food dictionaries.
+fn migrate_food_favorite(conn: &Connection) -> Result<()> {
+    let exists: bool = conn.query_row(
+        "SELECT EXISTS(SELECT 1 FROM pragma_table_info('foods') WHERE name = 'favorite')",
+        [],
+        |row| row.get(0),
+    )?;
+    if !exists {
+        conn.execute_batch(
+            "ALTER TABLE foods ADD COLUMN favorite INTEGER NOT NULL DEFAULT 0 CHECK (favorite IN (0, 1));",
+        )?;
+    }
+    Ok(())
+}
+
+pub fn toggle_food_favorite(food_id: i64) -> Result<usize> {
+    toggle_favorite(&get_connection()?, food_id)
+}
+
+fn toggle_favorite(conn: &Connection, food_id: i64) -> Result<usize> {
+    conn.execute("UPDATE foods SET favorite = NOT favorite WHERE id = ?1", params![food_id])
 }
 
 // One settings row per local user. Preserve the legacy table, but copy its row
@@ -78,12 +104,12 @@ pub fn insert_food(food: &FoodItem) -> Result<i64> {
     let conn = get_connection()?;
 
     conn.execute(
-        "INSERT INTO foods (product_name, brand, barcode, kcal, proteins, carbohydrates, fat, standard_portion)
-        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7,?8)",
+        "INSERT INTO foods (product_name, brand, barcode, kcal, proteins, carbohydrates, fat, standard_portion, favorite)
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
         params![
             food.product_name, food.brand, food.barcode,
             food.kcal, food.proteins, food.carbohydrates,
-            food.fat, food.standard_portion
+            food.fat, food.standard_portion, food.favorite
         ],
     )?;
     Ok(conn.last_insert_rowid())
@@ -94,7 +120,7 @@ pub fn insert_food(food: &FoodItem) -> Result<i64> {
 pub fn get_product_by_barcode(barcode: &str) -> Result<Option<FoodItem>> {
     let conn = get_connection()?;
     let mut stmt = conn.prepare(
-        "SELECT id, product_name, brand, barcode, kcal, proteins, carbohydrates, fat, standard_portion
+        "SELECT id, product_name, brand, barcode, kcal, proteins, carbohydrates, fat, standard_portion, favorite
         FROM foods WHERE barcode = ?1"
     )?;
 
@@ -111,10 +137,36 @@ pub fn get_product_by_barcode(barcode: &str) -> Result<Option<FoodItem>> {
                 carbohydrates: row.get(6)?,
                 fat: row.get(7)?,
                 standard_portion: row.get(8)?,
+                favorite: row.get(9)?,
             })
         })
         .optional()?;
     Ok(food)
+}
+
+pub fn get_favorite_foods() -> Result<Vec<FoodItem>> {
+    read_favorite_foods(&get_connection()?)
+}
+
+fn read_favorite_foods(conn: &Connection) -> Result<Vec<FoodItem>> {
+    let mut stmt = conn.prepare(
+        "SELECT id, product_name, brand, barcode, kcal, proteins, carbohydrates, fat, standard_portion, favorite
+         FROM foods WHERE favorite = 1 ORDER BY product_name COLLATE NOCASE, id",
+    )?;
+    stmt.query_map([], |row| {
+        Ok(FoodItem {
+            id: row.get(0)?,
+            product_name: row.get(1)?,
+            brand: row.get(2)?,
+            barcode: row.get(3)?,
+            kcal: row.get(4)?,
+            proteins: row.get(5)?,
+            carbohydrates: row.get(6)?,
+            fat: row.get(7)?,
+            standard_portion: row.get(8)?,
+            favorite: row.get(9)?,
+        })
+    })?.collect()
 }
 
 pub fn get_daily_macros(date: &str) -> Result<DailyMacroSummary> {
@@ -176,7 +228,7 @@ pub fn get_logged_foods_for_date(date: &str) -> Result<Vec<LogDisplayItem>> {
 
     let mut stmt = conn.prepare(
         "SELECT d.id, f.product_name, f.brand, d.quantity_in_grams, 
-            f.kcal, f.proteins, f.carbohydrates, f.fat, f.standard_portion
+            f.kcal, f.proteins, f.carbohydrates, f.fat, f.standard_portion, f.id, f.favorite
          FROM consumption_log d
          JOIN foods f ON d.food_id = f.id
          WHERE d.consumption_date = ?1",
@@ -205,6 +257,8 @@ pub fn get_logged_foods_for_date(date: &str) -> Result<Vec<LogDisplayItem>> {
 
         Ok(LogDisplayItem {
             log_id,
+            food_id: row.get(9)?,
+            favorite: row.get(10)?,
             product_name,
             brand,
             quantity_in_grams: quantity,
@@ -219,8 +273,19 @@ pub fn get_logged_foods_for_date(date: &str) -> Result<Vec<LogDisplayItem>> {
     Ok(daily_items)
 }
 
+pub fn get_log_entry(log_id: i64) -> Result<Option<(String, f32)>> {
+    get_connection()?.query_row(
+        "SELECT f.product_name || ' · ' || f.brand, d.quantity_in_grams
+         FROM consumption_log d JOIN foods f ON f.id = d.food_id WHERE d.id = ?1",
+        [log_id], |row| Ok((row.get(0)?, row.get(1)?)),
+    ).optional()
+}
+
 pub fn delete_log_entry(log_id: i64) -> Result<usize> {
-    let conn = get_connection()?;
+    delete_entry(&get_connection()?, log_id)
+}
+
+fn delete_entry(conn: &Connection, log_id: i64) -> Result<usize> {
 
     let rows_affected =
         conn.execute("DELETE FROM consumption_log WHERE id = ?1", params![log_id])?;
@@ -229,7 +294,10 @@ pub fn delete_log_entry(log_id: i64) -> Result<usize> {
 }
 
 pub fn update_log_quantity(log_id: i64, new_quantity_in_grams: f32) -> Result<usize> {
-    let conn = get_connection()?;
+    update_quantity(&get_connection()?, log_id, new_quantity_in_grams)
+}
+
+fn update_quantity(conn: &Connection, log_id: i64, new_quantity_in_grams: f32) -> Result<usize> {
 
     let rows_affected = conn.execute(
         "UPDATE consumption_log SET quantity_in_grams = ?1 WHERE id =?2",
@@ -271,6 +339,7 @@ pub fn insert_custom_food(
         carbohydrates,
         fat,
         standard_portion,
+        favorite: false,
     };
     insert_food(&custom_food)
 }
@@ -393,5 +462,94 @@ mod settings_tests {
             read_daily_goals(&conn).unwrap().unwrap().target_kcal,
             2300.0
         );
+    }
+}
+
+#[cfg(test)]
+mod favorite_tests {
+    use super::*;
+
+    #[test]
+    fn favorites_include_only_saved_foods_without_requiring_log_entries() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE foods (id INTEGER PRIMARY KEY, product_name TEXT, brand TEXT,
+             barcode TEXT, kcal REAL, proteins REAL, carbohydrates REAL, fat REAL,
+             standard_portion REAL, favorite INTEGER);
+             INSERT INTO foods VALUES (1, 'Zucchini', 'Farm', '001', 20, 1, 3, 0, 100, 1),
+             (2, 'Apple', 'Farm', '002', 52, 0, 14, 0, 100, 0),
+             (3, 'banana', 'Farm', '003', 89, 1, 23, 0, 100, 1);"
+        ).unwrap();
+        let foods = read_favorite_foods(&conn).unwrap();
+        assert_eq!(foods.iter().map(|food| food.id.unwrap()).collect::<Vec<_>>(), [3, 1]);
+        assert_eq!(foods[0].standard_portion, 100.0);
+        assert_eq!(foods[0].kcal, 89.0);
+        assert!(foods.iter().all(|food| food.favorite));
+        toggle_favorite(&conn, 3).unwrap();
+        assert_eq!(read_favorite_foods(&conn).unwrap().len(), 1);
+        toggle_favorite(&conn, 1).unwrap();
+        assert!(read_favorite_foods(&conn).unwrap().is_empty());
+    }
+
+
+    #[test]
+    fn legacy_foods_gain_a_persistent_boolean_without_losing_data() {
+        let path = std::env::temp_dir().join(format!(
+            "ultimate-macro-favorites-{}-{}.db", std::process::id(),
+            SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_nanos()
+        ));
+        {
+            let conn = Connection::open(&path).unwrap();
+            conn.execute_batch(
+                "CREATE TABLE foods (id INTEGER PRIMARY KEY, standard_portion REAL NOT NULL);
+                 INSERT INTO foods VALUES (1, 100), (2, 50);"
+            ).unwrap();
+            migrate_food_favorite(&conn).unwrap();
+            let original: (f32, bool) = conn.query_row(
+                "SELECT standard_portion, favorite FROM foods WHERE id = 1", [],
+                |row| Ok((row.get(0)?, row.get(1)?))
+            ).unwrap();
+            assert_eq!(original, (100.0, false));
+            assert_eq!(toggle_favorite(&conn, 1).unwrap(), 1);
+            assert_eq!(toggle_favorite(&conn, 999).unwrap(), 0);
+            assert!(conn.execute("UPDATE foods SET favorite = 2 WHERE id = 1", []).is_err());
+        }
+        {
+            let conn = Connection::open(&path).unwrap();
+            migrate_food_favorite(&conn).unwrap();
+            let read = |id| conn.query_row("SELECT favorite FROM foods WHERE id = ?1", [id], |row| row.get::<_, bool>(0)).unwrap();
+            assert!(read(1));
+            assert!(!read(2));
+            toggle_favorite(&conn, 1).unwrap();
+            assert!(!read(1));
+            let columns: Vec<String> = conn.prepare("PRAGMA table_info(foods)").unwrap()
+                .query_map([], |row| row.get(1)).unwrap().collect::<Result<_>>().unwrap();
+            assert_eq!(columns, ["id", "standard_portion", "favorite"]);
+        }
+        std::fs::remove_file(path).unwrap();
+    }
+}
+
+#[cfg(test)]
+mod log_edit_tests {
+    use super::*;
+
+    #[test]
+    fn editing_and_deleting_target_one_consumption_of_the_same_food() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch(
+            "CREATE TABLE consumption_log (id INTEGER PRIMARY KEY, food_id INTEGER, quantity_in_grams REAL);
+             INSERT INTO consumption_log VALUES (1, 7, 100), (2, 7, 200);"
+        ).unwrap();
+        assert_eq!(update_quantity(&conn, 1, 125.5).unwrap(), 1);
+        let quantities: Vec<f32> = conn.prepare("SELECT quantity_in_grams FROM consumption_log ORDER BY id").unwrap()
+            .query_map([], |row| row.get(0)).unwrap().collect::<Result<_>>().unwrap();
+        assert_eq!(quantities, [125.5, 200.0]);
+        assert_eq!(delete_entry(&conn, 1).unwrap(), 1);
+        assert_eq!(delete_entry(&conn, 1).unwrap(), 0);
+        assert_eq!(update_quantity(&conn, 1, 50.0).unwrap(), 0);
+        let remaining: (i64, f32) = conn.query_row("SELECT id, quantity_in_grams FROM consumption_log", [],
+            |row| Ok((row.get(0)?, row.get(1)?))).unwrap();
+        assert_eq!(remaining, (2, 200.0));
     }
 }

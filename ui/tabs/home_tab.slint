@@ -14,6 +14,8 @@ export component HomeTab inherits Rectangle {
     in property <[LogDisplayData]> food-log;
     in property <string> dashboard-error;
     callback open-scanner();
+    callback edit-log(string);
+    callback toggle-favorite(string, bool);
 
 
     // Base container
@@ -24,7 +26,7 @@ export component HomeTab inherits Rectangle {
         // Arc progress bar
         VerticalLayout {
             padding: 10px;
-            padding-top: 45px;
+            padding-top: 50px;
             alignment: start;
         
             Rectangle {
@@ -101,6 +103,10 @@ export component HomeTab inherits Rectangle {
                         wrap: word-wrap;
                     }
                     for item in root.food-log : LogItem {
+                        selectable: true;
+                        selected => { root.edit-log(item.log-id); }
+                        favorite: item.favorite;
+                        toggle-favorite => { root.toggle-favorite(item.food-id, item.favorite); }
                         name: item.name;
                         details: item.details;
                         calories: item.calories;

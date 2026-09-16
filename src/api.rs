@@ -113,6 +113,7 @@ pub async fn fetch_food_by_barcode(barcode: &str) -> Result<FoodItem, String> {
     // Map the API data to the structure in models.rs
     // Using unwrap_or as a fallback in case of incomplete labels
     let food_item = FoodItem {
+        favorite: false,
         id: None, // As it will be assigned automatically by SQLite
         product_name: product
             .product_name
