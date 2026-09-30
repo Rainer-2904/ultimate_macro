@@ -117,10 +117,8 @@ fn parse_goal(value: &str, label: &str) -> Result<f32, String> {
 }
 
 #[tokio::main]
-// Avoided using 'Result' on main to properly log errors and exit in a civilized manner.
-// Otherwise, the error would be thrown to tokio instead
-// and the program would exit with a non-zero code without any logging.
-// WHICH IS NOT IDEAL.
+// Both platform entry points use this startup path. Errors are logged here;
+// returning early does not communicate a failure exit code to the desktop shell.
 pub async fn run() {
     logic::init_logger();
 

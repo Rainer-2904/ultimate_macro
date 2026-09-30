@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 
-// Item struct
+/// Nutrient amounts describe `standard_portion` grams, not necessarily 100 g.
+/// Energy is in kcal; proteins, carbohydrates, and fat are in grams.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FoodItem {
     // 'Option' to autogenerate id when inserted into db
@@ -23,6 +24,7 @@ pub struct DailyConsumptionLog {
     pub id: Option<i64>,
     pub food_id: i64,
     pub quantity_in_grams: f32,
+    // Local calendar date in YYYY-MM-DD format; keep aligned with dashboard queries.
     pub consumption_date: String,
 }
 

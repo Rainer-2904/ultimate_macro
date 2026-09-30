@@ -110,8 +110,9 @@ pub async fn fetch_food_by_barcode(barcode: &str) -> Result<FoodItem, String> {
         fat: None,
     });
 
-    // Map the API data to the structure in models.rs
-    // Using unwrap_or as a fallback in case of incomplete labels
+    // Missing nutrients currently become zero and are cached that way. Supporting
+    // unknown values later requires changes to FoodItem, persistence, and totals
+    // so incomplete labels can be distinguished from actual zero nutrient content.
     let food_item = FoodItem {
         favorite: false,
         id: None, // As it will be assigned automatically by SQLite
@@ -126,7 +127,7 @@ pub async fn fetch_food_by_barcode(barcode: &str) -> Result<FoodItem, String> {
         proteins: nutriments.proteins.unwrap_or(0.0),
         carbohydrates: nutriments.carbohydrates.unwrap_or(0.0),
         fat: nutriments.fat.unwrap_or(0.0),
-        standard_portion: 100.0, // OpenFoodFacts only uses per 100g, if using another DB check to make sure
+        standard_portion: 100.0, // Must match the selected *_100g fields above.
     };
     Ok(food_item)
 }

@@ -1,5 +1,8 @@
 use crate::models::DailyMacroSummary;
 
+/// Scale nutrients from the reference portion to the consumed weight in grams.
+/// Callers must supply finite values and a positive standard portion; this helper
+/// does not reject invalid input or guard against division by zero.
 pub fn calculate_consumed_macros(
     consumed_quantity: f32,
     standard_portion: f32,

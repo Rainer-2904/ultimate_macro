@@ -58,6 +58,8 @@ fn lookup(ui: &MainWindow, state: Arc<Mutex<State>>, input: &str) {
     let handle = ui.as_weak();
     tokio::spawn(async move {
         let result = logic::lookup_food(&barcode).await;
+        // Tokio workers must marshal UI changes back to Slint's event loop.
+        // The weak handle allows the window to close while a request is pending.
         let _ = handle.upgrade_in_event_loop(move |ui| {
             let mut state = state.lock().unwrap();
             if state.generation != generation || !ui.get_scanner_visible() {
@@ -84,6 +86,8 @@ fn lookup(ui: &MainWindow, state: Arc<Mutex<State>>, input: &str) {
     });
 }
 
+/// Keep the returned timer alive for the window's lifetime: Android camera
+/// results are consumed by its polling callback. Desktop returns an idle timer.
 pub fn connect(ui: &MainWindow) -> Timer {
     let state = Arc::new(Mutex::new(State::default()));
     ui.set_camera_available(cfg!(target_os = "android"));

@@ -74,10 +74,14 @@ fn call(method: &str, signature: &str, args: &[JValue]) -> Result<Option<String>
     })
 }
 
+// JNI method names and signatures must stay aligned with MainActivity.java.
 pub fn start_scan(generation: u64) -> Result<(), String> {
     call("startScan", "(J)V", &[JValue::Long(generation as i64)]).map(|_| ())
 }
 
+// Java consumes its pending result on read: None means nothing new. Results use
+// "generation|OK:barcode", "generation|ERROR:message", or "generation|CANCELLED";
+// keep this protocol aligned with the parser in scanner::connect.
 pub fn take_scan_result() -> Result<Option<String>, String> {
     call("takeScanResult", "()Ljava/lang/String;", &[])
 }

@@ -9,7 +9,8 @@ pub fn get_connection() -> Result<Connection> {
     Connection::open(crate::storage::path("ultimate_macro.db"))
 }
 
-// Initialize the db tables
+// CREATE IF NOT EXISTS only bootstraps missing tables; it does not migrate an
+// existing schema. Future column/constraint changes need an explicit migration.
 pub fn init_db() -> Result<()> {
     let conn = get_connection()?;
 
@@ -172,6 +173,8 @@ fn read_favorite_foods(conn: &Connection) -> Result<Vec<FoodItem>> {
 pub fn get_daily_macros(date: &str) -> Result<DailyMacroSummary> {
     let conn = get_connection()?;
 
+    // History references current food data, not a nutrient snapshot. Updating a
+    // cached food would also change past totals and the log display below.
     let mut stmt = conn.prepare(
         "SELECT d.quantity_in_grams, f.kcal, f.proteins, f.carbohydrates, f.fat, f.standard_portion
         FROM consumption_log d
@@ -315,14 +318,10 @@ pub fn insert_custom_food(
     fat: f32,
     standard_portion: f32,
 ) -> Result<i64> {
-    /*
-    We generate a unique string based on timestamp since the barcode
-    column in the local db has 'UNIQUE NOT NULL' property,
-    meaning that the barcode field cannot be empty.
-    Cheap hack but it will do since I have 0 intention to rethink the SQL
-    and changing the property will surely fuck something up.
-    */
-    let timestamp = SystemTime::now() // Also store it as u64 because 2038 is just around the corner
+    // Custom foods need a synthetic key in the shared UNIQUE barcode column.
+    // Second-resolution timestamps can collide for two inserts in the same second;
+    // use a stronger identifier before supporting batch or rapid custom entry.
+    let timestamp = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .expect("Time went backwards")
         .as_secs();

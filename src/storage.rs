@@ -4,6 +4,8 @@ static DATA_DIR: std::sync::OnceLock<PathBuf> = std::sync::OnceLock::new();
 
 #[cfg(target_os = "android")]
 pub fn init(path: PathBuf) {
+    // The first directory wins for the process lifetime. Call before initializing
+    // logging or SQLite; both resolve their files through path().
     let _ = DATA_DIR.set(path);
 }
 
